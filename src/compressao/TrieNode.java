@@ -1,4 +1,4 @@
-package compressao;
+package trabalhoed;
 
 /**
  * Classe que representa um nó na árvore de Huffman.
