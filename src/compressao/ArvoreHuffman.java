@@ -1,4 +1,4 @@
-package compressao;
+package trabalhoed;
 
 import java.util.HashMap;
 import java.util.Map;
