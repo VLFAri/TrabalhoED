@@ -1,4 +1,6 @@
 import java.util.Scanner;
+import extracao.InserirDocumentosEComprimeComHuffman;
+import hash.HashTable;
 import java.util.Map;
 import java.io.IOException;
 
@@ -27,7 +29,7 @@ public class App{
 				if(funcaoHashEscolhida.equals("divisao") ) { //Se for divisao
 					HashTable<Integer, String> hash = new HashTable<Integer, String>(artigosComprimidos.size(),"divisao");
 					for(int i=0;i<artigosComprimidos.size();i++) {
-						hash.inserir(,);
+						// hash.inserir();
 					}
 				}
 				

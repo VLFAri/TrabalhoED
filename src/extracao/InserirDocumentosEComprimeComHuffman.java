@@ -1,9 +1,11 @@
-package trabalhoed;
+package extracao;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
+import compactacao.ArvoreHuffman;
 
 /**
  * Nessa classe, iremos inserir os artigos da pasta na qual o caminho digitado pelo usuário aponta e extrair o conteúdo de cada arquivo.
