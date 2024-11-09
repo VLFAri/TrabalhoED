@@ -1,4 +1,3 @@
-package trabalhoed;
 import java.util.Scanner;
 import java.util.Map;
 import java.io.IOException;
