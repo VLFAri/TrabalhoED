@@ -1,5 +1,4 @@
 package hash;
-
 import java.util.LinkedList;
 
 /**
@@ -125,21 +124,4 @@ public class HashTable<V> {
     	System.out.println("Documentos anexados com sucesso!");
         return tabelaHash; // Inserido com sucesso
     }
-    
-    public void print() {
-		for(int i = 0; i < tabelaHash.length; i++) {
-			System.out.println("---------------");
-			System.out.println("Position " + i + ":");
-			if(tabelaHash[i] == null) {
-				System.out.println("Empty position");
-			}
-			else {
-				LinkedList<HashEntry<V>> currentList = tabelaHash[i];
-				for (int j = 0; j < currentList.size(); j++) {
-					System.out.print(currentList.get(j).toString() + "  -  ");
-				}
-				System.out.println();
-			}
-		}
-	}
 }
