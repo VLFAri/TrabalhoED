@@ -7,47 +7,18 @@ package hash;
  * @param <K> o tipo da chave
  * @param <V> o tipo do valor
  */
-public class HashEntry<K, V> {
-    private K key;
+public class HashEntry<V> {
     private V valor;
     
     /**
-     * Construtor para criar uma nova entrada de hash com uma chave e um valor.
+     * Construtor para criar uma nova entrada de hash com um valor.
      *
-     * @param key a chave a ser associada
      * @param valor o valor a ser associado
      */
-    public HashEntry(K key, V valor) {
-        this.key = key;
+    public HashEntry(V valor) {
         this.valor = valor;
     }
     
-    /**
-     * Retorna uma representação em string da entrada de hash.
-     *
-     * @return uma string no formato "(chave, valor)"
-     */
-    public String toString() {
-        return "(" + key + ", " + valor + ")";
-    }
-
-    /**
-     * Retorna a chave associada a esta entrada.
-     *
-     * @return a chave
-     */
-    public K getKey() {
-        return key;
-    }
-
-    /**
-     * Define a chave para esta entrada.
-     *
-     * @param key a chave a ser definida
-     */
-    public void setKey(K key) {
-        this.key = key;
-    }
 
     /**
      * Retorna o valor associado a esta entrada.
@@ -66,4 +37,8 @@ public class HashEntry<K, V> {
     public void setValor(V valor) {
         this.valor = valor;
     }
+    
+    public String toString() {
+		return "(" + valor + ")";
+	}
 }
