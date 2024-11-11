@@ -6,12 +6,11 @@ import java.util.LinkedList;
  * A classe HashTable implementa uma tabela hash genérica para armazenar pares chave-valor.
  * Utiliza listas encadeadas para lidar com colisões.
  *
- * @param <K> o tipo da chave
  * @param <V> o tipo do valor
  */
-public class HashTable<K, V> {
+public class HashTable<V> {
 
-    private LinkedList<HashEntry<K, V>>[] tabelaHash; // Array de listas encadeadas para armazenar as entradas da tabela hash
+    private LinkedList<HashEntry<V>>[] tabelaHash; // Array de listas encadeadas para armazenar as entradas da tabela hash
     private int size; // Tamanho da tabela hash
     private String funcaoHashing; // Armazena qual função hash utilizar.
 
@@ -27,11 +26,11 @@ public class HashTable<K, V> {
         this.funcaoHashing = funcaoHashing;
     }
 
-    private int getPosicao(K value) {
+    private int getPosicao(String value) {
 		if(funcaoHashing == "divisao"){
-            return hashDivisao((String) value);
+            return hashDivisao(value);
         } else if (funcaoHashing == "djb2"){
-            return hashDJB2((String)value);
+            return hashDJB2(value);
         } else {
             return -1;
         }
@@ -47,9 +46,8 @@ public class HashTable<K, V> {
 
     private int hashDJB2 (String texto) {
         long hash = 5381;
-        hash = ((hash << 5) + hash); // hash * 33
         for (char c : texto.toCharArray()) {
-            hash += c; // hash + c
+        	hash = (( hash << 5) + hash ) + c; // hash * 33
         }
         return (int) (hash % Integer.MAX_VALUE) ; // hash % 2147483647
     }
@@ -60,7 +58,7 @@ public class HashTable<K, V> {
      * @param key a chave cuja lista de valores deve ser retornada
      * @return uma lista de valores associados à chave ou null se a chave não existir
      */
-    public LinkedList<V> getValor(K key) {
+    public LinkedList<V> getValor(String key) {
         int posicao;
         LinkedList<V> valoresEncontrados = new LinkedList<>();
 
@@ -77,10 +75,10 @@ public class HashTable<K, V> {
             return null; // Nenhum elemento com essa chave
         } else {
             // Itera pela lista na posição para encontrar os valores
-            LinkedList<HashEntry<K, V>> listaAtual = tabelaHash[posicao];
+            LinkedList<HashEntry<V>> listaAtual = tabelaHash[posicao];
             for (int i = 0; i < listaAtual.size(); i++) {
-                HashEntry<K, V> entradaAtual = listaAtual.get(i);
-                if (key.equals(entradaAtual.getKey())) {
+                HashEntry<V> entradaAtual = listaAtual.get(i);
+                if (key.equals(entradaAtual.getValor())) {
                     valoresEncontrados.add(entradaAtual.getValor()); // Adiciona o valor encontrado
                 }
             }
@@ -95,53 +93,53 @@ public class HashTable<K, V> {
      * @param valor o valor a ser associado à chave
      * @return true se a inserção for bem-sucedida, false se a chave for nula ou se a chave já existe com o mesmo valor.
      */
-    public boolean inserir(K key, V valor) {
-        int posicao;
-
-        // Verifica se a chave é nula
-        if (key == null) {
-            return false;
-        }
-
-        // Verifica se a chave já existe com o mesmo valor
-        LinkedList<V> valorAtualParaChave = getValor(key);
-        if (valorAtualParaChave != null && valorAtualParaChave.contains(valor)) {
-            return false; // Valor já existente para a chave
-        }
-
-        // Obtém a posição na tabela hash
-        posicao = getPosicao(key);
-
-        // Obtém a lista atual na posição
-        LinkedList<HashEntry<K, V>> listaAtual = tabelaHash[posicao];
-
-        // Se a posição é nula, cria uma nova lista
-        if (listaAtual == null) {
-            listaAtual = new LinkedList<>();
-        }
-
-        listaAtual.add(new HashEntry<>(key, valor)); // Adiciona a nova entrada
-        tabelaHash[posicao] = listaAtual; // Atualiza a tabela hash
-
-        return true; // Inserido com sucesso
+    public LinkedList<HashEntry<V>>[] inserir(Map<String,String> arquivos) {
+    	
+    	for(String i : arquivos.values()) {
+    		String texto = i;
+    		
+	        int posicao;
+	
+	        // Verifica se a chave já existe com o mesmo valor
+	        LinkedList<V> valorAtualParaChave = getValor(texto);
+	        if (valorAtualParaChave != null && valorAtualParaChave.contains(texto)) {
+	            return null; // Valor já existente para a chave
+	        }
+	
+	        // Obtém a posição na tabela hash
+	        posicao = getPosicao(texto);
+	
+	        // Obtém a lista atual na posição
+	        LinkedList<HashEntry<V>> listaAtual = tabelaHash[posicao];
+	
+	        // Se a posição é nula, cria uma nova lista
+	        if (listaAtual == null) {
+	            listaAtual = new LinkedList<>();
+	        }
+	
+	        listaAtual.add(new HashEntry(texto)); // Adiciona a nova entrada
+	        tabelaHash[posicao] = listaAtual; // Atualiza a tabela hash
+	        
+    	}
+    	
+    	System.out.println("Documentos anexados com sucesso!");
+        return tabelaHash; // Inserido com sucesso
     }
-
-    /**
-     * Imprime o conteúdo da tabela hash, exibindo a posição e as entradas nela.
-     */
+    
     public void print() {
-        for (int i = 0; i < tabelaHash.length; i++) {
-            System.out.println("---------------");
-            System.out.println("Posição " + i + ":");
-            if (tabelaHash[i] == null) {
-                System.out.println("Posição vazia");
-            } else {
-                LinkedList<HashEntry<K, V>> listaAtual = tabelaHash[i];
-                for (int j = 0; j < listaAtual.size(); j++) {
-                    System.out.print(listaAtual.get(j).toString() + "  -  ");
-                }
-                System.out.println();
-            }
-        }
-    }
+		for(int i = 0; i < tabelaHash.length; i++) {
+			System.out.println("---------------");
+			System.out.println("Position " + i + ":");
+			if(tabelaHash[i] == null) {
+				System.out.println("Empty position");
+			}
+			else {
+				LinkedList<HashEntry<V>> currentList = tabelaHash[i];
+				for (int j = 0; j < currentList.size(); j++) {
+					System.out.print(currentList.get(j).toString() + "  -  ");
+				}
+				System.out.println();
+			}
+		}
+	}
 }
