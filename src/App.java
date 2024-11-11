@@ -1,7 +1,10 @@
-import java.util.Scanner;
 import extracao.InserirDocumentosEComprimeComHuffman;
 import hash.HashTable;
+import hash.HashEntry;
+import java.util.Scanner;
+import hash.HashTable;
 import java.util.Map;
+import java.util.LinkedList;
 import java.io.IOException;
 
 /**
@@ -26,15 +29,15 @@ public class App{
 			
 			//Usuário deve escolher entre divisao e djb2
 			if(funcaoHashEscolhida.equals("divisao") || funcaoHashEscolhida.equals("djb2")) {
+				LinkedList<HashEntry<String>>[] insere_hash;
 				if(funcaoHashEscolhida.equals("divisao") ) { //Se for divisao
-					HashTable<Integer, String> hash = new HashTable<Integer, String>(artigosComprimidos.size(),"divisao");
-					for(int i=0;i<artigosComprimidos.size();i++) {
-						// hash.inserir();
-					}
+					HashTable<String> hash = new HashTable<String>(artigosComprimidos.size(),"divisao");
+					insere_hash = hash.inserir(artigosComprimidos);
 				}
 				
 				else { //Se for djb2
-					
+					HashTable<String> hash = new HashTable<String>(artigosComprimidos.size(),"djb2");
+					insere_hash = hash.inserir(artigosComprimidos);
 				}
 				
 				System.out.println("");
@@ -51,3 +54,4 @@ public class App{
 		}
 	}
 }
+
