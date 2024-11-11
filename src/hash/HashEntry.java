@@ -37,8 +37,4 @@ public class HashEntry<V> {
     public void setValor(V valor) {
         this.valor = valor;
     }
-    
-    public String toString() {
-		return "(" + valor + ")";
-	}
 }
