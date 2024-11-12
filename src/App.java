@@ -31,13 +31,13 @@ public class App{
 			if(funcaoHashEscolhida.equals("divisao") || funcaoHashEscolhida.equals("djb2")) {
 				LinkedList<HashEntry<String>>[] insere_hash;
 				if(funcaoHashEscolhida.equals("divisao") ) { //Se for divisao
-					HashTable<String> hash = new HashTable<String>(artigosComprimidos.size(),"divisao");
-					insere_hash = hash.inserir(artigosComprimidos);
+					HashTable<String> hash_table = new HashTable<String>(artigosComprimidos.size(),"divisao");
+					insere_hash = hash_table.inserir(artigosComprimidos);
 				}
 				
 				else { //Se for djb2
-					HashTable<String> hash = new HashTable<String>(artigosComprimidos.size(),"djb2");
-					insere_hash = hash.inserir(artigosComprimidos);
+					HashTable<String> hash_table = new HashTable<String>(artigosComprimidos.size(),"djb2");
+					insere_hash = hash_table.inserir(artigosComprimidos);
 				}
 				
 				System.out.println("");
