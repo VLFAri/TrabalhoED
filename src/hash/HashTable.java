@@ -1,5 +1,6 @@
 package hash;
-import java.util.LinkedList;
+import compactacao.ArvoreHuffman;
+import java.util.*;
 
 /**
  * A classe HashTable implementa uma tabela hash genérica para armazenar pares chave-valor.
@@ -7,9 +8,9 @@ import java.util.LinkedList;
  *
  * @param <V> o tipo do valor
  */
-public class HashTable<V> {
+public class HashTable<K,V> {
 
-    private LinkedList<HashEntry<V>>[] tabelaHash; // Array de listas encadeadas para armazenar as entradas da tabela hash
+    private LinkedList<HashEntry>[] tabelaHash; // Array de listas encadeadas para armazenar as entradas da tabela hash
     private int size; // Tamanho da tabela hash
     private String funcaoHashing; // Armazena qual função hash utilizar.
 
@@ -48,7 +49,7 @@ public class HashTable<V> {
         for (char c : texto.toCharArray()) {
         	hash = (( hash << 5) + hash ) + c; // hash * 33
         }
-        return (int) (hash % Integer.MAX_VALUE) ; // hash % 2147483647
+        return Math.abs((int) (hash % size)) ; // hash % 2147483647
     }
 
     /**
@@ -57,9 +58,9 @@ public class HashTable<V> {
      * @param key a chave cuja lista de valores deve ser retornada
      * @return uma lista de valores associados à chave ou null se a chave não existir
      */
-    public LinkedList<V> getValor(String key) {
+    public LinkedList<String> getValor(String key) {
         int posicao;
-        LinkedList<V> valoresEncontrados = new LinkedList<>();
+        LinkedList<String> valoresEncontrados = new LinkedList<String>();
 
         // Verifica se a chave é nula
         if (key == null) {
@@ -74,9 +75,9 @@ public class HashTable<V> {
             return null; // Nenhum elemento com essa chave
         } else {
             // Itera pela lista na posição para encontrar os valores
-            LinkedList<HashEntry<V>> listaAtual = tabelaHash[posicao];
+            LinkedList<HashEntry> listaAtual = tabelaHash[posicao];
             for (int i = 0; i < listaAtual.size(); i++) {
-                HashEntry<V> entradaAtual = listaAtual.get(i);
+                HashEntry entradaAtual = listaAtual.get(i);
                 if (key.equals(entradaAtual.getValor())) {
                     valoresEncontrados.add(entradaAtual.getValor()); // Adiciona o valor encontrado
                 }
@@ -92,36 +93,74 @@ public class HashTable<V> {
      * @param valor o valor a ser associado à chave
      * @return true se a inserção for bem-sucedida, false se a chave for nula ou se a chave já existe com o mesmo valor.
      */
-    public LinkedList<HashEntry<V>>[] inserir(Map<String,String> arquivos) {
+    public boolean inserir(Map<String,String> arquivos) {
     	
-    	for(String i : arquivos.values()) {
-    		String texto = i;
+    	for(String a: arquivos.keySet()) {
+    		String texto = arquivos.get(a);
+    		String nome = a;
     		
 	        int posicao;
 	
 	        // Verifica se a chave já existe com o mesmo valor
-	        LinkedList<V> valorAtualParaChave = getValor(texto);
+	        LinkedList<String> valorAtualParaChave = getValor(texto);
 	        if (valorAtualParaChave != null && valorAtualParaChave.contains(texto)) {
-	            return null; // Valor já existente para a chave
+	            return false; // Valor já existente para a chave
 	        }
 	
 	        // Obtém a posição na tabela hash
 	        posicao = getPosicao(texto);
 	
 	        // Obtém a lista atual na posição
-	        LinkedList<HashEntry<V>> listaAtual = tabelaHash[posicao];
+	        LinkedList<HashEntry> listaAtual = tabelaHash[posicao];
 	
 	        // Se a posição é nula, cria uma nova lista
 	        if (listaAtual == null) {
 	            listaAtual = new LinkedList<>();
 	        }
 	
-	        listaAtual.add(new HashEntry(texto)); // Adiciona a nova entrada
+	        listaAtual.add(new HashEntry(nome,texto)); // Adiciona a nova entrada
 	        tabelaHash[posicao] = listaAtual; // Atualiza a tabela hash
 	        
     	}
     	
-    	System.out.println("Documentos anexados com sucesso!");
-        return tabelaHash; // Inserido com sucesso
+    	System.out.println("Documentos indexados com sucesso!");
+        return true; // Inserido com sucesso
     }
+    
+    public void mostrarConteudo(String name, Map <String,String> docs) {
+		for(int i = 0; i < tabelaHash.length; i++) {
+			if(tabelaHash[i] == null) {
+				continue;
+			}
+			else {
+				LinkedList<HashEntry> currentList = tabelaHash[i];
+				for (int j = 0; j < currentList.size(); j++) {
+					if(currentList.get(j).getNome().equals(name)){
+						ArvoreHuffman arvore = new ArvoreHuffman(docs.get(name));
+						String texto = arvore.Descomprimir(currentList.get(j).getValor());
+						
+						String[] paragraphs = texto.split("     ");
+						System.out.println(name + ":");				        
+				        for (String paragraph : paragraphs) {
+				            System.out.print("    "); // Espaçamento inicial do parágrafo
+				            String[] words = paragraph.trim().split("\\s+");
+				            int wordCount = 0;
+				            
+				            // Formatar linha com limite de palavras
+				            for (String word : words) {
+				                if (wordCount >= 20) {
+				                    System.out.println();
+				                    wordCount = 0;
+				                }
+				                System.out.print(word + " ");
+				                wordCount++;
+				            }
+				            System.out.println("");
+				        }
+				    }
+				}
+					
+			}
+		}
+	}	
 }
