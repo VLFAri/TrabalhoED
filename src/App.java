@@ -1,6 +1,7 @@
 import extracao.InserirDocumentosEComprimeComHuffman;
 import hash.HashTable;
 import hash.HashEntry;
+import trie.Trie;
 import java.util.*;
 import java.io.IOException;
 
@@ -64,11 +65,11 @@ public class App{
 				System.out.println("A palavra '" + palavra + "' foi encontrada nos seguintes documentos:");
 				boolean verifica = false; //boolean usado para ver se alguma palavra foi encontrada em algum artigo
 				for(String word: palavrasNComprimidos.keySet()) { //Aqui ele vai percorrer todo o Mapa e ver se encontra a palavra utilizando a Trie
-					Trie trie = new Trie(); //Objeto que instancia a classe Trie
+					Trie new_trie = new Trie(); //Objeto que instancia a classe Trie
 					for(int i=0;i<palavrasNComprimidos.get(word).size();i++) { //Percorre o array da chave que estiver sendo percorrida no momento
-						trie.inserir(palavrasNComprimidos.get(word).get(i)); //Insere cada palavra do array na Trie
+						new_trie.inserir(palavrasNComprimidos.get(word).get(i)); //Insere cada palavra do array na Trie
 					}
-					if(trie.buscarPalavra(palavra)) { //O método irá retornar true se encontrar a palavra que o usuário digitou ou false caso contrário
+					if(new_trie.buscarPalavra(palavra)) { //O método irá retornar true se encontrar a palavra que o usuário digitou ou false caso contrário
 						System.out.println(word); //Imprime o artigo na qual a palavra foi encontrada
 						verifica = true; //Se achou, "verifica" agora fica true
 					}
