@@ -9,9 +9,9 @@ public class Trie {
     }
 
     // Método para inserir uma palavra na Trie
-    public void inserir(String palavra) {
+    public void inserir(String texto) {
         TrieNode node = root;
-        for (char c : palavra.toCharArray()) { // Pega letra por letra da palavra
+        for (char c : texto.toCharArray()) { // Pega letra por letra da palavra
             /*
              * Se, entre seus filhos da arvore, não existir c
              * é criado um filho c.
