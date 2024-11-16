@@ -1,7 +1,5 @@
 package trie;
-
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class TrieNode {
     
@@ -40,7 +38,7 @@ public class TrieNode {
     public boolean isFimPalavra() {
         return fimPalavra;
     }
-
+    
     /**
      * @param fimPalavra the fimPalavra to set
      */
