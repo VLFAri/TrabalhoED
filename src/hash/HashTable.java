@@ -49,7 +49,7 @@ public class HashTable<K,V> {
         for (char c : texto.toCharArray()) {
         	hash = (( hash << 5) + hash ) + c; // hash * 33
         }
-        return Math.abs((int) (hash % size)) ; // hash % 2147483647
+        return Math.abs((int) (hash % size)) ; 
     }
 
     /**
@@ -95,9 +95,9 @@ public class HashTable<K,V> {
      */
     public boolean inserir(Map<String,String> arquivos) {
     	
-    	for(String a: arquivos.keySet()) {
-    		String texto = arquivos.get(a);
-    		String nome = a;
+    	for(String a: arquivos.keySet()) { //Laço para percorrer todas as chaves do mapa
+    		String texto = arquivos.get(a); //Conteudo do arquivo (valor da chave que está sendo iterada)
+    		String nome = a; //Nome do arquivo (chave que está sendo iterada)
     		
 	        int posicao;
 	
@@ -127,20 +127,33 @@ public class HashTable<K,V> {
         return true; // Inserido com sucesso
     }
     
+    /* O método abaixo serve para transcrever o texto do arquivo que o usuário selecionou dos arquivos que continham
+       a palavra que ele mandou buscar.
+     */
+    
     public void mostrarConteudo(String name, Map <String,String> docs) {
-		for(int i = 0; i < tabelaHash.length; i++) {
-			if(tabelaHash[i] == null) {
-				continue;
-			}
-			else {
-				LinkedList<HashEntry> currentList = tabelaHash[i];
-				for (int j = 0; j < currentList.size(); j++) {
-					if(currentList.get(j).getNome().equals(name)){
-						ArvoreHuffman arvore = new ArvoreHuffman(docs.get(name));
-						String texto = arvore.Descomprimir(currentList.get(j).getValor());
+    	boolean deve_parar = false; //Irá dizer se o laço deve continuar rodando ou não (continuará rodando se o arquivo ainda não for achado)
+	for(int i = 0; i < tabelaHash.length; i++) { //Irá percorrer a tabela Hash
+			
+		if(deve_parar) { //Laço não rodará mais pois o arquivo já foi encontrado!
+			break;
+		}
+		if(tabelaHash[i] == null) { //Se a posicão da Hash no momento da iteração for nula, ele só continua e vai para a próxima posição
+			continue;
+		}
+		else { //Caso não seja...
+			LinkedList<HashEntry> currentList = tabelaHash[i]; //váriavel será a posição da Hash atual
+			for (int j = 0; j < currentList.size(); j++) { //Laço irá percorrer a posição da Hash (cada posição é uma lista encadeada)
+				if(currentList.get(j).getNome().equals(name)){ /*Se um determinado nó da posição tiver uma chave com o mesmo nome que o usuário digitou outrora
+										logo, achamos o arquivo que queremos descomprimir*/
+					deve_parar = true; //Arquivo encontrado, não precisa rodar mais o laço depois da extração
+					ArvoreHuffman arvore = new ArvoreHuffman(docs.get(name)); //Objeto irá estanciar a classe Arvore Huffman
+					String texto = arvore.Descomprimir(currentList.get(j).getValor()); //Texto será descomprimido
 						
-						String[] paragraphs = texto.split("     ");
-						System.out.println(name + ":");				        
+					/*A partir da próxima linha o código apenas irá seoarar o texto em várias linhas (já que ele vem em apenas uma linha), deixando cada linha
+					 com no máximo 20 palavras.*/
+					String[] paragraphs = texto.split("     ");
+					System.out.println(name + ":");				        
 				        for (String paragraph : paragraphs) {
 				            System.out.print("    "); // Espaçamento inicial do parágrafo
 				            String[] words = paragraph.trim().split("\\s+");
@@ -158,9 +171,11 @@ public class HashTable<K,V> {
 				            System.out.println("");
 				        }
 				    }
-				}
-					
+				}	
 			}
+			
 		}
-	}	
+		
+		return;
+	}
 }
