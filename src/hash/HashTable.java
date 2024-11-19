@@ -27,7 +27,7 @@ public class HashTable<K,V> {
     }
 
     private int getPosicao(String value) {
-		if(funcaoHashing == "divisao"){
+	if(funcaoHashing == "divisao"){
             return hashDivisao(value);
         } else if (funcaoHashing == "djb2"){
             return hashDJB2(value);
@@ -103,28 +103,29 @@ public class HashTable<K,V> {
 	
 	        // Verifica se a chave já existe com o mesmo valor
 	        LinkedList<String> valorAtualParaChave = getValor(texto);
-	        if (valorAtualParaChave != null && valorAtualParaChave.contains(texto)) {
-	            return false; // Valor já existente para a chave
+	         if (valorAtualParaChave != null && valorAtualParaChave.contains(texto)) {        	
+	            continue; // Valor já existente para a chave
 	        }
+	        else { //Valor não existe, logo inserimos!
 	
-	        // Obtém a posição na tabela hash
-	        posicao = getPosicao(texto);
-	
-	        // Obtém a lista atual na posição
-	        LinkedList<HashEntry> listaAtual = tabelaHash[posicao];
-	
-	        // Se a posição é nula, cria uma nova lista
-	        if (listaAtual == null) {
-	            listaAtual = new LinkedList<>();
+		        // Obtém a posição na tabela hash
+		        posicao = getPosicao(texto);
+		
+		        // Obtém a lista atual na posição
+		        LinkedList<HashEntry> listaAtual = tabelaHash[posicao];
+		
+		        // Se a posição é nula, cria uma nova lista
+		        if (listaAtual == null) {
+		            listaAtual = new LinkedList<>();
+		        }
+		
+		        listaAtual.add(new HashEntry(nome,texto)); // Adiciona a nova entrada
+		        tabelaHash[posicao] = listaAtual; // Atualiza a tabela hash
 	        }
-	
-	        listaAtual.add(new HashEntry(nome,texto)); // Adiciona a nova entrada
-	        tabelaHash[posicao] = listaAtual; // Atualiza a tabela hash
-	        
-    	}
+	}
     	
     	System.out.println("Documentos indexados com sucesso!");
-        return true; // Inserido com sucesso
+        return true; // Indexado com sucesso
     }
     
     /* O método abaixo serve para transcrever o texto do arquivo que o usuário selecionou dos arquivos que continham
