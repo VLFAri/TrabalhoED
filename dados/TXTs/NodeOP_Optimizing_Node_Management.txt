@@ -1,0 +1,979 @@
+
+NodeOP: Optimizing Node Management for
+Decentralized Networks
+
+Angela Tsang Jiankai Sun
+angela.tsang@morphl2.io jksun@stanford.edu
+Morph Team; HKUST Stanford
+
+Boo Xie Azeem Khan
+boo.xie@morphl2.io ak@morphl2.io
+
+Morph Team Morph Team
+
+Ender Lu Fletcher Fan
+ender.lu@morphl2.io fletcher.fan@morphl2.io
+
+Morph Team Morph Team
+
+Maggie Wu Jing Tang
+maggie@foresightventures.com jingtang@ust.hk
+
+Foresight Ventures HKUST
+
+1 Abstract
+
+In this paper, we introduce NodeOP, an advanced framework for optimizing the
+management of General Node Operators in decentralized networks. By integrat-
+ing Agent-Based Modeling (ABM) with a Tendermint Byzantine Fault Toler-
+ance (BFT)-based consensus mechanism, NodeOP effectively addresses critical
+challenges in task allocation, consensus formation, and system stability.
+
+Through precise mathematical modeling and formal optimization techniques,
+NodeOP achieves stable equilibrium in node task distribution. Our framework
+is validated through convergence analysis and key performance metrics such as
+transaction throughput, system latency, and fault tolerance. To demonstrate
+NodeOP’s practical value, we explore two key applications: decentralized se-
+quencer management in Layer 2 networks and off-chain payment validation.
+These use cases illustrate how NodeOP enhances validation efficiency and gen-
+erates new revenue opportunities in large-scale consumer environments.
+
+Our findings highlight NodeOP as a flexible and scalable solution for de-
+centralized node management, offering significant advancements in operational
+efficiency and economic sustainability for decentralized systems.
+
+1
+
+
+2 Background
+
+2.1 The Crucial Role of Active Validated Services (AVS)
+in the Eigenlayer
+
+Active Validated Services (AVS) enhance Ethereum’s functionality by providing
+additional validation services such as data availability layers, virtual machines,
+and oracle networks. These services rely on Ethereum restakers who ensure a
+security model where the cost of corruption significantly outweighs any poten-
+tial gains from malicious actions [1]. By utilizing existing Ethereum nodes as
+validators and imposing strict penalties for misconduct, Eigenlayer establishes
+a robust and secure environment for restaking.
+
+2.2 Advancements and Challenges in Ethereum’s Decen-
+tralization
+
+Recent initiatives within the Ethereum ecosystem, such as Vitalik Buterin’s
+introduction of ”anti-correlation incentives” on March 27th, aim to mitigate
+the risks of validator centralization by increasing penalties for large validators
+failing simultaneously [6]. This strategy enhances network resilience against
+coordinated attacks. The milestone of reaching one million validators post-
+Shapella upgrade emphasizes the need for more computational resources, while
+also highlighting the risk of centralized hosting solutions, which pose significant
+challenges to maintaining economic security and network integrity [8].
+
+2.3 Decentralization as a Core Challenge and Its Extended
+Impacts
+
+Addressing decentralization in Ethereum reveals several intricately connected
+challenges that, when mitigated, can greatly enhance the stability and effective-
+ness:
+
+• Mobility of Stakeholders: The fluid interactions among restakers, Liq-
+uid Restaking Tokens (LRTs), and Node Operators introduce economic
+uncertainties. Decentralizing the infrastructure reduces the dependence
+on any single group of stakeholders, thereby distributing risks more evenly
+across the network and enhancing economic security [11].
+
+• Reward Volatility: The early stages of AVS deployment are often marked
+by unpredictable rewards, which pose risks to sustaining long-term secu-
+rity strategies. A decentralized approach can help stabilize these rewards
+by diversifying the sources and methods of distribution, thus reducing the
+impact of volatility on the system’s overall stability [3].
+
+• Resource Planning and Uncertainty: The diverse requirements across
+AVS complicate resource allocation, particularly for emerging services like
+shared sequencers and Rollups-as-a-Service. Decentralization facilitates a
+
+2
+
+
+
+more adaptive and responsive resource management system, allowing for
+an efficient distribution of resources that can meet the varied demands of
+different AVS without centralized bottlenecks [2].
+
+• Concurrent Slashing Risks: When security is centralized, pooling
+across diverse AVS could expose more secure networks to risks associ-
+ated with less reliable services. Decentralization minimizes these risks by
+spreading out the security responsibilities, thereby reducing the potential
+impact of failures within any single AVS component [4].
+
+• Long-Tail AVS Risk Compounding: The trend towards centralization
+can lead well-established operators to favor high-yield, compliant AVS,
+potentially neglecting niche services which then remain under-secured.
+By promoting a decentralized model, the security and support can be
+more uniformly distributed, ensuring that all services, including those less
+prominent, receive adequate protection [9].
+
+• Node Fragmentation:
+
+– Absence of Unified System for Scheduling and Resource Al-
+location: This deficiency creates significant inefficiencies, as seen in
+the management of GPU nodes by Ritual and Depin nodes by Wit-
+ness, which underscore substantial coordination gaps. These can be
+mitigated through a more collaborative and systematic management
+framework [10].
+
+– Complicated Cryptographic Key Management: The decen-
+tralized nature complicates the management of cryptographic keys
+essential for secure node-to-node communications and transaction
+validation. Without a cohesive strategy, the network is exposed to
+security vulnerabilities and can experience operational delays during
+critical activities [12].
+
+2.4 Conclusion
+
+To overcome the challenges outlined above, the development of a scalable, ro-
+bust management framework is imperative. Such a framework would not only
+streamline operations and enhance security but also support the scalable expan-
+sion of Eigenlayer’s infrastructure. It would enable the system to accommodate
+rising demands while maintaining high security and operational standards. Our
+research seeks to explore innovative solutions aimed at enhancing node coor-
+dination, resource management, and cryptographic security within the Eigen-
+layer ecosystem, thereby addressing the critical issues associated with general
+node operators, while extending Ethereum’s security paradigm to encompass
+AI/DePin security [7].
+
+3
+
+
+
+3 NodeOP
+
+We present an advanced optimizer tailored to optimize General Node Oper-
+ator management, leveraging the decentralized Eigenlayer security. Designed
+to facilitate consensus and streamline management among operators, this layer
+offers decentralized sequencers for high-scalability Layer 2 and acts as a vital
+consumer layer for General Node Operators.
+
+Operating as a cornerstone within the framework of both Active Validated
+Services (AVS) and General Node Operators, our NodeOP ensures the integrity
+and reliability of data managed by AVS operators while efficiently processing
+tasks for General Node Operators. Orchestrating the decentralized aggregation
+of computational tasks, it handles sorting, packaging, and consensus-building for
+Layer 2 transactions. Powered by a Tendermint BFT-based consensus mecha-
+nism, it constructs a robust Layer 2 blockchain infrastructure, integrating each
+operator’s contributions securely [5].
+
+The NodeOP’s operational workflow focuses on three core processes: ag-
+gregation of results, submission of aggregated results, and subsequent analysis
+with associated rewards and penalties. This operational efficiency is essential
+for transaction validation and consensus within the AVS and General Node
+Operator ecosystems.
+
+3.1 Aggregation of Results
+
+Within the AVS system, Operators are tasked with various computational re-
+sponsibilities, such as packaging, sorting, and creating consensus blocks for
+Layer 2 transactions. These tasks generate results that need to be compiled
+into consistent data batches. To achieve decentralized aggregation, we imple-
+ment a Tendermint BFT-based consensus mechanism. This involves construct-
+ing a Layer 2 blockchain and utilizing a designated token for validator staking.
+Each Operator, also serving as a Tendermint validator, collaborates to integrate
+the data through a consensus-driven approach, resulting in the generation of an
+aggregated signature. This signature is crucial for ensuring the accuracy and
+trustworthiness of the aggregated results, thus strengthening the integrity of the
+entire system [1].
+
+• Consensus Mechanism Execution: The NodeOP employs a Tender-
+mint BFT consensus mechanism. Validators collaborate through a round-
+based process, which includes proposing, prevoting, and precommitting.
+Finalization of the block and generation of the aggregated signature occur
+only when two-thirds consensus is reached.
+
+• State Synchronization: Node state synchronization is maintained through
+a gossip protocol, facilitating the sharing and replication of transaction
+data [6].
+
+• Data Packaging and Sorting: Operators organize data batches into
+standardized formats, optimizing for minimal redundancy and efficient
+
+4
+
+
+
+Figure 1: Workflow of the NodeOP.
+
+5
+
+
+
+processing [8].
+
+3.2 Submission of Aggregated Results
+
+Upon aggregation, the results must be submitted to the AVS contract. To mit-
+igate the risks associated with single points of failure and transaction conflicts,
+the system employs a scheduling mechanism. This mechanism assigns each Op-
+erator specific time windows for result submission, effectively distributing tasks
+and minimizing overlaps. Notably, this strategic allocation not only reduces con-
+flicts but also bolsters the system’s overall fault tolerance. In instances where
+an Operator encounters issues, provisions are in place to enable other Operators
+to intervene, ensuring the uninterrupted submission of aggregated results and
+preserving system stability [11].
+
+• Dynamic Scheduling: Operators are allocated distinct time windows
+dynamically for submission, thus preventing overlaps and minimizing trans-
+action conflicts [3].
+
+• Fallback Mechanisms: In the event of an Operator failing to submit
+within the designated window, fallback mechanisms enable other Opera-
+tors to step in, ensuring continuity [2].
+
+3.3 Analysis and Rewards/Penalties for Submission
+
+Upon submission, the aggregated results undergo meticulous verification and
+analysis within the AVS contract. Operators receive compensation in two forms:
+tokens provided by the task issuer and transaction fees for successfully submit-
+ting aggregated results to the AVS contract. A robust penalty mechanism,
+operational through the Tendermint layer blockchain, penalizes Operators for
+non-participation in computation tasks or ineffective engagement in the con-
+sensus process. Typical penalties involve the reduction of staked tokens. This
+system of rewards and penalties is structured to incentivize active participation
+and efficient execution by Operators, while simultaneously deterring miscon-
+duct. Such measures are vital for ensuring the seamless and healthy operation
+of the system [4].
+
+• Performance-Based Rewards: Operators who complete tasks success-
+fully are rewarded based on their performance, which is adjusted dynam-
+ically to ensure fairness [9].
+
+• Penalty Mechanism: Penalties are enacted via Tendermint’s governance
+mechanisms, typically reducing staked tokens for non-participation or in-
+effective consensus engagement [10].
+
+• Reputation and Priority Systems: Historical performance is tracked,
+building a reputation for Operators. Those with consistent performance
+receive preferential treatment and priority access to future high-value
+transactions [12].
+
+6
+
+
+
+3.4 Conclusion
+
+NodeOP is a crucial component in General Node Operator frameworks, ensuring
+data integrity and efficient task processing. Through its decentralized aggrega-
+tion processes, supported by the Tendermint BFT-based consensus mechanism,
+NodeOP ensures precise task coordination among operators. This framework
+streamlines transaction validation and consensus, enhancing the overall perfor-
+mance of both ecosystems.
+
+NodeOP’s dynamic scheduling and fallback mechanisms reduce task conflicts
+and bolster fault tolerance, ensuring system stability during result submission.
+The system’s architecture allows for smooth operation by adapting to potential
+failures and maintaining synchronization across nodes, safeguarding the net-
+work’s reliability.
+
+Finally, the implementation of a reward and penalty system, combined with
+reputation and priority mechanisms, motivates active participation and discour-
+ages misconduct. These measures ensure that operators are aligned with the
+system’s goals, providing a solid foundation for a trustworthy and scalable de-
+centralized network[5].
+
+4 Mathematical Model
+
+Building on the robust framework established in the NodeOP, we employ Agent-
+Based Modeling (ABM) to simulate and optimize the interactions and behaviors
+of General Node Operators within this system. ABM is an effective tool for ana-
+lyzing complex systems comprised of autonomous agents, each following defined
+rules and striving to maximize their individual utility. It enables the detailed
+simulation of actions and interactions of agents to observe emergent behaviors
+in decentralized networks. Each agent in our model represents a General Node
+Operator within the NodeOP, operating based on specific utility functions that
+balance consensus, performance scores, and associated costs [1].
+
+4.1 Model Setup
+
+In the context of the NodeOP, we define the following key parameters:
+
+• Ci(t, τ): Consensus score for agent i at time t for task τ .
+
+• Si(t, τ): Performance score for agent i at time t for task τ .
+
+• w1, w2: Weights for consensus and performance scores, respectively.
+
+• Cost(τ): Cost incurred by agent i for performing task τ .
+
+• CorruptionCost(τ): Additional cost due to corruption.
+
+• Ti: Trust score for agent i, based on historical performance [1].
+
+The utility function for an agent i engaged in task τ at time t is:
+
+Ui(t, τ) = w1 · Ci(t, τ) + w2 · Si(t, τ)− Cost(τ)− CorruptionCost(τ).
+
+7
+
+
+
+Figure 2: Agent-Based Modeling framework for General Node Operators in the
+NodeOP. The diagram illustrates the interaction between agents, task alloca-
+tion, consensus mechanisms, and the feedback loop for optimization.
+
+4.2 Utility Maximization and Equilibrium Condition
+
+Our model aims to simulate and optimize the interactions and behaviors of
+General Node Operators. The primary objective of this model is to maximize
+economic value within the decentralized network. Each agent seeks to maximize
+its utility function. By incorporating trust scores and historical performance,
+we ensure that agents are incentivized to maintain consistent and reliable per-
+formance [6].
+
+max
+τ
+
+Ui(t, τ) = max
+τ
+
+(w1 · Ci(t, τ) + w2 · Si(t, τ)− Cost(τ)− CorruptionCost(τ)) .
+
+The equilibrium condition for agent i is:
+
+∀i, ∄τ ′ ∈ T : Ui(t, τ
+′) > Ui(t, τ).
+
+This ensures each agent maximizes its utility considering both consensus and
+individual performance [8].
+
+4.3 Mathematical Analysis
+
+We further enrich our model with detailed mathematical analysis to understand
+the dynamics and equilibrium conditions of the system.
+
+8
+
+
+
+4.3.1 Optimal Task Allocation
+
+To find the optimal task allocation, we solve the following optimization problem:
+
+max
+τ∈T
+
+n∑
+i=1
+
+Ui(t, τ)
+
+Subject to:
+n∑
+
+i=1
+
+xi(t, τ) ≤ R(t, τ) ∀τ ∈ T
+
+where xi(t, τ) is the task allocation for agent i at time t for task τ , and
+R(t, τ) is the resource constraint [11].
+
+4.3.2 Lagrange Multipliers for Constraints
+
+The optimization problem is subject to the following constraints:
+
+Ti(t) ≤ Ci(t), Vi(t) ≤ Vmax, Cost(τ) ≤ Ri(t),
+
+where Ci(t) is the maximum transaction capacity, Vi(t) is the validation
+cost, and Ri(t) represents the available resources. The Lagrange multiplier λi
+
+handles these constraints, yielding the Lagrangian function:
+
+L =
+
+n∑
+i=1
+
+Ui(t, τ) +
+
+n∑
+i=1
+
+λi
+
+(
+R(t, τ)−
+
+n∑
+i=1
+
+xi(t, τ)
+
+)
+Differentiating L with respect to xi(t, τ) and setting the derivative to zero
+
+provides the optimal allocation condition:
+
+w1 ·
+∂Ci(t, τ)
+
+∂xi(t, τ)
++ w2 ·
+
+∂Si(t, τ)
+
+∂xi(t, τ)
+=
+
+∂Cost(τ)
+
+∂xi(t, τ)
++ λi
+
+This ensures the optimal distribution of tasks while considering the perfor-
+mance and consensus scores.
+
+4.3.3 Equilibrium and Stability Analysis
+
+At equilibrium, the agents’ utilities are balanced by the constraints:
+
+w1 ·
+∂Ci(t, τ)
+
+∂xi(t, τ)
++ w2 ·
+
+∂Si(t, τ)
+
+∂xi(t, τ)
+=
+
+∂Cost(τ)
+
+∂xi(t, τ)
++
+
+∂CorruptionCost(τ)
+
+∂xi(t, τ)
++ λi
+
+The stability of the equilibrium can be analyzed by examining the second-
+order conditions. Specifically, the Hessian matrix of the Lagrangian function
+should be positive semi-definite:
+
+9
+
+
+
+H =
+
+
+∂2L
+∂x2
+
+1
+
+∂2L
+∂x1∂x2
+
+· · · ∂2L
+∂x1∂xn
+
+∂2L
+∂x2∂x1
+
+∂2L
+∂x2
+
+2
+· · · ∂2L
+
+∂x2∂xn
+
+...
+...
+
+. . .
+...
+
+∂2L
+∂xn∂x1
+
+∂2L
+∂xn∂x2
+
+· · · ∂2L
+∂x2
+
+n
+
+
+To ensure stability, the eigenvalues of the Hessian matrix should all be non-
+
+negative. This indicates that small perturbations in task allocations will not lead
+to significant deviations in the agents’ utilities, thereby ensuring the stability of
+the system [2].
+
+4.3.4 Convergence Analysis
+
+We further perform a convergence analysis to ensure the stability of the task
+allocation process. The iterative update rule is given by:
+
+x(k+1) = x(k) − α∇L(x(k))
+
+where α is the learning rate. The choice of α plays a crucial role in determin-
+ing the speed of convergence. Through numerical experiments, we found that
+setting α = 0.01 achieves a balance between convergence speed and stability.
+For larger α, convergence may oscillate, while for smaller α, convergence is slow
+but stable. The optimization is considered converged when:
+
+∥x(k+1) − x(k)∥ < ϵ
+
+where ϵ = 10−6 ensures that the task allocation stabilizes with negligible
+fluctuations.
+
+4.4 Aggregation of Results
+
+The aggregated result at time t is calculated as:
+
+A(t) =
+
+∑
+i wi ·Ri(t)∑
+
+i wi
+,
+
+where Ri(t) represents the results reported by agent i and wi is the weight
+assigned to agent i based on trust or historical performance. This aggregated
+result feeds back into the system, allowing for real-time adjustments and opti-
+mizations to achieve better outcomes continuously. This feedback mechanism
+ensures that the results are constantly refined and improved, leading to more
+accurate and reliable outcomes over time [10].
+
+10
+
+
+
+4.4.1 Real-Time Adjustments and Feedback Mechanism
+
+The real-time feedback mechanism plays a crucial role in optimizing the ag-
+gregated results. By continuously monitoring the performance of agents and
+adjusting task allocations dynamically, the system can respond to changes and
+improve overall efficiency. The feedback loop involves the following steps:
+
+a. Performance Monitoring: Continuously track the performance metrics
+of each agent.
+
+b. Dynamic Adjustment: Adjust the task allocations and weights based
+on real-time performance data.
+
+c. Optimization Loop: Iterate the process to refine the allocations and
+improve the aggregated results [12].
+
+4.5 Conclusion
+
+NodeOP offers a robust framework for optimizing task distribution and consen-
+sus among General Node Operators in decentralized networks. By leveraging
+Agent-Based Modeling (ABM) and a Tendermint BFT consensus mechanism, it
+ensures high performance and stability, particularly in demanding applications
+like L2 sequencing and off-chain payment validation.
+
+Compared to Eigenlayer, NodeOP introduces more detailed constraints that
+account for node historical performance, trust scores, and error handling. These
+additional constraints ensure tasks are distributed not only based on resource
+availability but also node reliability, leading to more stable outcomes. Moreover,
+NodeOP is tailored to specific use cases, providing clearer guidance for resource
+management and consensus formation, which is less defined in Eigenlayer’s gen-
+eralized framework.
+
+NodeOP also offers a formal convergence analysis, ensuring task distribution
+reaches stable equilibrium after multiple iterations. This focus on optimization
+and feedback mechanisms guarantees that even under resource constraints, the
+system remains stable.
+
+By integrating these enhanced constraints and stability features, NodeOP
+provides a powerful solution for decentralized task management, adaptable to
+both on-chain and off-chain scenarios.
+
+5 Use Cases of NodeOP
+
+Our research demonstrates the practical effectiveness of NodeOP through two
+primary use cases. Task 1 focuses on a Layer 2 (L2) sequencer, while Task 2
+expands to off-chain payment validation. These examples highlight NodeOP’s
+ability to enhance node-level revenue generation, extending beyond ETH L2 to
+include validation services in large-scale consumer scenarios.
+
+11
+
+
+
+5.1 Task 1: Sequencer in L2 Solutions
+
+The first use case examines NodeOP’s application as a Layer 2 (L2) sequencer,
+where decentralized sequencers handle transaction validation in a Layer 2 en-
+vironment. NodeOP’s framework leverages consensus mechanisms to optimize
+task allocation, ensuring high throughput, low latency, and robust fault toler-
+ance.
+
+5.1.1 Optimization and Quantitative Metrics
+
+The mathematical model for NodeOP optimizes task allocation for sequencers
+to achieve high throughput and low latency. Key metrics include:
+
+• Transaction Throughput (T ):
+
+T =
+
+∑n
+i=1 Ri(t)
+
+Latency(t)
+,
+
+where Ri(t) is the task output of node i at time t. By optimizing task
+allocation, Ri(t) is maximized, leading to higher throughput. Therefore,
+as Ri(t) ↑, T ↑.
+
+• System Latency (L):
+
+L =
+
+∑n
+i=1 tvalidation,i
+
+N
+,
+
+where tvalidation,i is the time taken by node i to validate its assigned tasks,
+and N is the total number of nodes. Latency decreases as validation time
+tvalidation,i is optimized through consensus algorithms and efficient task
+distribution. The latency for each node is influenced by the consensus
+score Ci(t, τ) and the performance score Si(t, τ):
+
+tvalidation,i =
+1
+
+Ci(t, τ) + Si(t, τ)
+.
+
+As Ci(t, τ) and Si(t, τ) ↑, L ↓.
+
+• Fault Tolerance (F ):
+
+F = 1− Node Failures(t)
+
+N
+,
+
+where the number of node failures at time t is inversely related to the trust
+score Ti of each node:
+
+Node Failures(t) ∝ 1
+
+Ti
+.
+
+As Ti ↑, node failures decrease, leading to higher fault tolerance F ↑.
+
+12
+
+
+
+• Resource Utilization Efficiency (E):
+
+E =
+
+∑n
+i=1 Ri(t)−
+
+∑n
+i=1 Costi(t)∑n
+
+i=1 Total Resources(t)
+,
+
+where Costi(t) represents the resource cost for node i to complete its as-
+signed tasks. Efficient task allocation maximizes resource usage, ensuring
+that E increases as task completion costs are minimized. As Costi(t) ↓,
+E ↑.
+
+5.2 Task 2: Off-Chain Payment Validation with Decen-
+tralized Nodes
+
+The second use case focuses on off-chain payment validation, where decentralized
+nodes handle more complex tasks, such as verifying real-world consumer trans-
+actions. These tasks involve multiple layers of validation, including transac-
+tion validity, user identity, payment authorization, and fund availability checks.
+NodeOP enables nodes to maximize revenue by incorporating validation services
+in large-scale consumer scenarios.
+
+5.2.1 Mathematical Framework for Off-Chain Payment Validation
+
+Each node i processes a set of transactions Ti(t) at time t, incurring a validation
+cost Vi(t). The validation process includes multiple stages S1, S2, . . . , Sn, each
+with its own computational complexity and potential for errors. Nodes earn a
+validation fee Fi(t) per successfully validated transaction. The utility function
+Ui(t) accounts for the cost of error correction, Cerror(t), which arises if errors
+are detected:
+
+Ui(t) = Fi(t) · Ti(t)− Vi(t)− Cerror(t)− Pi(t),
+
+where:
+
+• Fi(t) is the fee earned per validated transaction,
+
+• Vi(t) is the cost of validating Ti(t) transactions,
+
+• Cerror(t) is the error correction cost incurred during validation,
+
+• Pi(t) is the penalty for delayed or missed validations.
+
+Each node maximizes its utility by minimizing validation costs and penalties
+while handling errors, under the following constraints.
+
+5.2.2 Optimization Constraints
+
+The optimization problem for off-chain payment validation is subject to the
+following constraints:
+
+13
+
+
+
+• Transaction Capacity Constraint: Each node i has a maximum trans-
+action capacity Ci(t), limiting the number of transactions it can process:
+
+Ti(t) ≤ Ci(t).
+
+• Validation Time Constraint: Transactions must be validated within a
+time window τmax. If the validation time tvalidation exceeds τmax, penalties
+Pi(t) are incurred:
+
+Pi(t) = λ ·max(0, Ti(t) · (tvalidation − τmax)),
+
+where λ is the penalty coefficient.
+
+• Error Correction Constraint: If errors are detected during validation,
+the node incurs an additional cost for revalidation. The error correction
+cost Cerror(t) is modeled as:
+
+Cerror(t) = γ · E(Ti(t)),
+
+where E(Ti(t)) is the number of errors detected, and γ is the error correc-
+tion cost coefficient.
+
+The utility optimization problem is formulated as:
+
+max
+Ti(t)
+
+Ui(t) = Fi(t)·Ti(t)−Vi(t)−γ ·E(Ti(t))−λ·max(0, Ti(t)·(tvalidation−τmax)),
+
+subject to:
+Ti(t) ≤ Ci(t).
+
+5.2.3 Convergence and Stability Analysis
+
+To ensure system stability during multi-stage validation, NodeOP introduces a
+feedback loop where task allocation is adjusted in real-time based on perfor-
+mance metrics such as validation time, error rates, and transaction complexity.
+Convergence is achieved when:
+
+∥xi(t+ 1)− xi(t)∥ < ϵ,
+
+where ϵ is a small tolerance. Stability is confirmed through the Hessian matrix
+H of the utility function Ui(t):
+
+H =
+
+[
+∂2Ui
+
+∂T 2
+i
+
+∂2Ui
+
+∂Ti∂Fi
+
+∂2Ui
+
+∂Fi∂Ti
+
+∂2Ui
+
+∂F 2
+i
+
+]
+,
+
+with all eigenvalues λ ≥ 0, ensuring local stability.
+
+14
+
+
+
+5.2.4 Performance Metrics for Off-Chain Validation
+
+The performance of NodeOP in off-chain payment validation is measured using
+the following metrics:
+
+• Transaction Throughput (Ttotal(t)):
+
+Ttotal(t) =
+
+n∑
+i=1
+
+Ti(t),
+
+representing the total number of validated transactions. As task allocation
+is optimized, throughput increases. As Ti(t) ↑, Ttotal(t) ↑.
+
+• Validation Efficiency (Evalidation(t)):
+
+Evalidation(t) =
+
+∑n
+i=1 Ti(t)∑n
+i=1 Vi(t)
+
+,
+
+reflecting the cost-effectiveness of validation. As validation costs Vi(t)
+decrease and transactions Ti(t) increase, Evalidation(t) ↑.
+
+• Error Rate Reduction (Eerror(t)):
+
+Eerror(t) =
+
+∑n
+i=1 E(Ti(t))∑n
+
+i=1 Ti(t)
+,
+
+measuring the error rate in transaction validation. Effective validation
+reduces errors, decreasing the error rate. As E(Ti(t)) ↓, Eerror(t) ↓.
+
+• Revenue Growth (Rgrowth(t)):
+
+Rgrowth(t) =
+Πtotal(t)−Πtotal(t− 1)
+
+Πtotal(t− 1)
+,
+
+measuring revenue growth over time. As throughput Ti(t) increases and
+error rates E(Ti(t)) decrease, revenue grows. Thus, Rgrowth(t) ↑.
+
+• Penalty Minimization: Reducing penalties by meeting validation dead-
+lines ensures better system performance. As penalties Pi(t) decrease, sys-
+tem reliability and revenue increase.
+
+Disclaimer
+
+The information provided in this document is for informational purposes only
+and should not be construed as legal, financial, or professional advice.
+
+The authors and their respective institutions do not guarantee the accuracy,
+completeness, or reliability of the information contained herein. The content is
+subject to change without notice, and the authors are not liable for any loss or
+damage arising from the use or reliance on this document.
+
+The views and opinions expressed in this white paper are those of the authors
+and do not necessarily reflect the official policy or position of Morph, HKUST,
+Stanford, Foresight Ventures or any of their affiliates.
+
+15
+
+
+
+References
+
+[1] Ethan Buchman. Tendermint: Byzantine Fault Tolerance in the Age of
+Blockchains. PhD thesis, 2016. PhD Thesis.
+
+[2] Vitalik Buterin. A next-generation smart contract and decentralized appli-
+cation platform. Ethereum White Paper, 2014.
+
+[3] Vitalik Buterin and Virgil Griffith. Casper the friendly finality gadget.
+2017. arXiv preprint arXiv:1710.09437.
+
+[4] Konstantinos Christidis and Michael Devetsikiotis. Blockchains and smart
+contracts for the internet of things. IEEE Access, 4:2292–2303, 2016.
+
+[5] Yossi Gilad, Rotem Hemo, Silvio Micali, Georgios Vlachos, and Nickolai
+Zeldovich. Algorand: Scaling byzantine agreements for cryptocurrencies.
+In Proceedings of the 26th Symposium on Operating Systems Principles
+(SOSP ’17), 2017.
+
+[6] Jae Kwon and Ethan Buchman. Cosmos: A network of distributed
+blockchains. White Paper, 2019.
+
+[7] Leslie Lamport, Robert Shostak, and Marshall Pease. The byzantine gener-
+als problem. ACM Transactions on Programming Languages and Systems
+(TOPLAS), 4(3):382–401, 1982.
+
+[8] Satoshi Nakamoto. Bitcoin: A peer-to-peer electronic cash system. 2008.
+
+[9] David Silver, Thomas Hubert, Julian Schrittwieser, Ioannis Antonoglou,
+Matthew Lai, Arthur Guez, Marc Lanctot, Laurent Sifre, Dharshan Ku-
+maran, Thore Graepel, Timothy Lillicrap, Karen Simonyan, and Demis
+Hassabis. Mastering chess and shogi by self-play with a general reinforce-
+ment learning algorithm. arXiv preprint arXiv:1712.01815, 2017.
+
+[10] Richard S. Sutton and Andrew G. Barto. Reinforcement Learning: An
+Introduction. MIT Press, 2018.
+
+[11] Gavin Wood. Ethereum: A secure decentralised generalised transaction
+ledger. Yellow paper, Ethereum Project, 2014.
+
+[12] Zibin Zheng, Shuwei Xie, Hong-Ning Dai, and Xianfeng Chen. Blockchain
+challenges and opportunities: A survey. International Journal of Web and
+Grid Services, 14(4):352–375, 2018.
+
+16
+
+
+	Abstract
+	Background
+	The Crucial Role of Active Validated Services (AVS) in the Eigenlayer
+	Advancements and Challenges in Ethereum's Decentralization
+	Decentralization as a Core Challenge and Its Extended Impacts
+	Conclusion
+
+	NodeOP
+	Aggregation of Results
+	Submission of Aggregated Results
+	Analysis and Rewards/Penalties for Submission
+	Conclusion
+
+	Mathematical Model
+	Model Setup
+	Utility Maximization and Equilibrium Condition
+	Mathematical Analysis
+	Optimal Task Allocation
+	Lagrange Multipliers for Constraints
+	Equilibrium and Stability Analysis
+	Convergence Analysis
+
+	Aggregation of Results
+	Real-Time Adjustments and Feedback Mechanism
+
+	Conclusion
+
+	Use Cases of NodeOP
+	Task 1: Sequencer in L2 Solutions
+	Optimization and Quantitative Metrics
+
+	Task 2: Off-Chain Payment Validation with Decentralized Nodes
+	Mathematical Framework for Off-Chain Payment Validation
+	Optimization Constraints
+	Convergence and Stability Analysis
+	Performance Metrics for Off-Chain Validation
+
+
+

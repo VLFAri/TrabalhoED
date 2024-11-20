@@ -1,0 +1,543 @@
+
+Short Paper: PSY: Posterior Sampling Based
+Privacy Enhancer in Large Language Models
+
+Yulian Sun1,3, , Li Duan1,2, , and Yong Li1,�
+
+1 Huawei Technologies Düsseldorf, Düsseldorf, Germany
+{yualian.sun1, li.duan, yong.li1}@huawei.com
+
+2 Paderborn University, Paderborn, Germany
+liduan@mail.upb.de
+
+3 Ruhr University Bochum, Bochum, Germany
+yulian.sun@edu.ruhr-uni-bochum.de
+
+Abstract. Privacy vulnerabilities in LLMs, such as leakage from mem-
+orization, have been constantly identified, and various mitigation pro-
+posals have been proposed. LoRA is usually used in fine-tuning LLMs
+and a good entry point to insert privacy-enhancing modules. In this on-
+going research, we introduce PSY, a Posterior Sampling based PrivacY
+enhancer that can be used in LoRA. We propose a simple yet effective
+realization of PSY using posterior sampling, which effectively prevents
+privacy leakage from intermediate information and, in turn, preserves the
+privacy of data owners. We evaluate LoRA extended with PSY against
+state-of-the-art membership inference and data extraction attacks. The
+experiments are executed on three different LLM architectures fine-tuned
+on three datasets with LoRA. In contrast to the commonly used differen-
+tial privacy method, we find that our proposed modification consistently
+reduces the attack success rate. Meanwhile, our method has almost no
+negative impact on model fine-tuning or final performance. Most impor-
+tantly, PSY reveals a promising path towards privacy enhancement with
+latent space extensions.
+
+Keywords: privacy enhancing technology, large language models
+
+1 Introduction
+
+Large Language Models (LLMs) mainly refer to transformer-based neural lan-
+guage models that contain up to hundreds of billions of parameters. Existing
+LLMs are firstly pre-trained on massive text data, such as LLaMA [27] and
+GPT-4 [1], then adapted for specific tasks. Up to 2020, direct fine-tuning was
+the mainstream method used for adaptation. However, to update a LLM with
+billions of parameters is computationally expensive. To deal with the problem,
+Hu et al. [12] propose LoRA, an efficient and computation-saving method in
+2021. Instead of updating all LLM parameters during fine-tuning, LoRA freezes
+the base weights of the pre-trained model, then pays attention to a distinct
+updating matrix.
+
+https://orcid.org/0009-0007-0088-0385
+https://orcid.org/0009-0001-1663-2622
+
+
+2 Y. Sun, L. Duan, Y. Li
+
+Unfortunately, no matter which methods are used for fine-tuning, LLM may
+memorize information. At inference time, LLMs may even reproduce sensitive
+information about samples in the training and fine-tuning dataset when being
+attacked [5, 11, 19]. The threat becomes more severe when a LLM is released as
+a public service.
+
+Fig. 1: LoRA usage example, the location and structure of LoRA in a LLM for
+specific task. LoRA freezes the pre-trained model weights W d and simulates the
+amount of parameter changes through low-rank decomposition with BA, which
+greatly reduces the number of trainable parameters for downstream tasks.
+
+1.1 Mitigating Leakage from Memorization
+
+Various efforts have been made to mitigate this issue. The mitigation proposals
+include identifying and removing highly memorized samples [20], preventing the
+generation of sensitive samples [23], and the most recent solution proposed by
+Hintersdorf et al. in 2024: localizing and deactivating (removing) memorization
+neurons [11]. Since modifying the structure of trained LLM as done Hintersdorf
+et al. [11] can defend against leakage caused by memorization, an interesting
+question to ask is: Instead of removing, can we add tiny modules to LLMs that
+can effectively hinder memorization?
+
+1.2 Hints from Defenses Against Related Attacks
+
+By investigating other attacks related to memorization, we can find hints about
+the necessary properties of the modules we are looking for.
+
+Membership inference attacks (MIAs) aim to determine whether a given sam-
+ple is in the training dataset [22]. Besides being a privacy threat itself, vulner-
+ability to MIA is a more general indicator of whether a trained model memo-
+rizes and leaks private information [14, 22, 31]. It was confirmed by Leino and
+
+
+
+Posterior Sampling Based Privacy Enhancer in LLM 3
+
+Fredrikson [14] in USENIX Security 2020 that DP with a small ϵ ≈ 0.25, i.e.,
+large perturbation, can thwart the membership inference attack caused by model
+memorization. However, the authors also pointed out the dilemma: large pertur-
+bation leads to sharp model accuracy reduction, whereas small perturbation
+(ϵ ≈ 16) makes little difference in front of the attacker. Therefore, it is preferred
+to have modules that can provide a DP-like guarantee, and its parameters can
+be adapted to the trained model and datasets.
+
+A review of structural defenses against gradient inversion [13] or data extrac-
+tion attack (DEA) [15] attacks† can also help us locate the appropriate module.
+While being an efficiency enhancer in many machine learning models [24, 30],
+variational auto-encoder (VAE) has also been studied for its positive impact
+on privacy protection. In 2022, Scheliga et al. proposed PRECODE, a privacy-
+enhancing module based on VAE which can be composed with model before
+training, and shown its effective defense against gradient inversion [21] in fed-
+erated learning (FL). In 2023, Wang et al. [29] injected controlled noise into
+recurrent VAE to generate synthesized data, which would then be used for FL
+training to preserve privacy. Furthermore, a recent study by Sun et al. [25] in
+2024 has shown that posterior sampling layer trained in the model can have a
+variant of DP called distance-based empirical local DP (dELDP) in inference.
+The experiments in [25] demonstrated that modules with dELDP can mitigate
+feature reconstruction attacks effectively in FL.
+
+1.3 Construbution
+
+Thus, we propose a new module that can effectively address problems caused
+by memorization. More specifically, we make the following contribution in this
+short paper.
+
+– We propose a tiny module called Posterior Sampling based PrivacY en-
+hancer (PSY) which, when added into a LLM, can effectively alleviate the
+memorization by a LLM of the fine-tuning dataset. We also identify the
+optimal insertion point of PSY in LoRA ( see Figure 2 for an illustration).
+
+– We empirically evaluate PSY on two state-of-the-art privacy attacks (MIA
+and DEA) on three Models trained on three real-world datasets and compare
+PSY with DP parameterized with a small ϵ.
+
+2 Other Related Work
+
+Membership Inference Attack (MIA). MIAs are typical privacy attacks, which
+allow attackers to distinguish if a given data sample was used for training in a tar-
+get model [22]. Meeus et al. [17] provide a document-level membership inference
+for real-world LLMs. Essentially, they seek to establish whether a LLM encoun-
+tered a certain document during its training or not with the help of overfitting.
+
+† Both attacks aim to recover sensitive information from different interfaces of the
+model.
+
+
+
+4 Y. Sun, L. Duan, Y. Li
+
+Fu et al. [8] proposed a novel MIA approach based on self-calibrated probabilistic
+variation, which leverages memorization (which occurs before overfitting) rather
+than overfitting itself. This allows the adversary to collect a dataset with a sim-
+ilar distribution from public APIs. Both [17] and [8] assume that the adversary
+has access to samples closely resembling the original training data. To deal with
+limitations, Mattern et al. [16] proposed a MIA using the concept of neighbor-
+hood comparison. This MIA compares model scores for a given sample to scores
+of synthetically generated neighbor texts and assumes that the attack has perfect
+knowledge about the training data distribution.
+
+Data Extraction Attack (DEA). DEA refers to a method where an adversary gets
+individual training instances from a language model that has been developed on
+private datasets [5]. Carlini et al. [5] proposed a DEA from language models,
+which aims to recover individual training examples by querying the language
+model. The attack scenario is the first one that involves querying a LLM. Yu
+et al. [32] proposed benchmark tricks for improving training data extraction
+using a publicly available dataset. The authors explore both text generation
+(e.g., sampling strategy) and text ranking (e.g., token-level criteria) tricks. Nasr
+et al. [19] propose a DEA that focuses on extractable memorization. This method
+refers to training data that an adversary can efficiently extract by querying a
+LLM. Besides, the authors also demonstrate that the adversary can successfully
+extract gigabytes of training data from three various types of LLMs: open-source
+models, semi-open models and closed models.
+
+Defenses Using Structural and Internal Randomness. In contrast to introducing
+external noise as in centralized DP or Local DP, Duan [7] introduced the notion
+of privacy-without-noise in 2009, which estimates the corresponding (ϵ, δ) from
+the inherent randomness in the dataset and the query and highlights that non-
+uniform internal noise can also help achieve reasonable DP-like privacy. Duan’s
+work also inspires [4,25] that offers ways to empirically quantify the internal and
+structural randomness, and [4, 25] also proposed structures that are effective
+against privacy attacks. The idea of PRECODE [21] is to insert a full VAE,
+which also has internal randomness, into models such that after training, the
+models can have empirical defenses against gradient inversion.
+
+3 Methodology
+
+3.1 PSY
+
+In this section, we introduce details of PSY, beginning with the general idea of
+adding a posterior sampling layer and following with the algorithmic description.
+
+3.2 General Idea
+
+We insert a posterior sampling layer in LoRA. VAE contains two parts: encoder
+and decoder. The biggest difference between PSY and PRECODE is that PSY
+
+
+
+Posterior Sampling Based Privacy Enhancer in LLM 5
+
+only needs the posterior sampling layer of VAE (in the encoder), i.e., the mapping
+from x to the latent vector z. The posterior sampling layer is inserted in A and
+B (See Figure 2). Given the input x, the output of A maps x into a fixed term
+latent-vector z, which is sampled from µ and Σ. Thus, the latent-vector z is
+
+z = µ(Ax) + ϵΣ(Ax) (1)
+
+Fig. 2: Structure of Posterior Sampling in between A and B.
+
+Assuming a pre-trained model with weight W0 ∈ Rd×k, we constrain its
+updates by representing∆W ∈ Rd×r with a low-rank decompositionW0+∆W =
+W0+BA, where B ∈ Rd×r, A ∈ Rr×k, and the rank r ≪ min(d, k) [12]. A and B
+contain trainable parameters. During training, W0 is frozen and does not receive
+gradient updates, while noting both W0 and ∆W = BA are multiplied with the
+same input x, and their respective output vectors are summed coordinate-wise.
+For a hidden layer h = W0x, then our modified forward pass yields:
+
+h = W0x+∆Wx = W0x+B[µ(Ax) + ϵΣ(Ax)] = W0x+Bz (2)
+
+Figure 2 shows the details of integrating posterior sampling and LoRA. Here,
+as we referred to the original method of LoRA, we also use a Gaussian initial-
+ization for A and zero for B. Thus, ∆W = BA is viewed as zero from the start
+of training. In our method, we also keep the scaling of ∆Wx by α
+
+r , where α is
+a constant in r. PSY also keeps efficiency, since tuning α is equivalent to tuning
+learning rate [12].
+
+4 Experiments
+
+4.1 Setup and Baselines
+
+We evaluate our method on three open-source LLMs, including GPT-Neo
+(2.7B) [3], RedPajama-INCITE (2.8B) [26] and Pythia (6.9B) [2], which
+
+
+
+6 Y. Sun, L. Duan, Y. Li
+
+have from 2.7 to 6.9 Billion of parameters. These LLMs are pre-trained and we
+download them from Hugging Face ‡§¶. We then fine-tune these models on other
+three datasets, including AG’s News [34],Twitter [10] andWikitext-103 [18]
+(See Table 1).
+
+Table 1: Datasets and Models. B represents Billion.
+Model #Param. #Dataset #Samples #Labels
+
+GPT-Neo 2.7B AG’s News 120K 4
+RedPajama-INCITE 2.8B Twitter 300k 2
+Pythia 6.9B WikiText-103 200k -
+
+We evaluate our methods from both functionality and defensive ability per-
+spectives. From a functionality perspective, we compare our method with a
+baseline that does not use protection methods or classic differential privacy tech-
+niques. We fine-tune our method and baseline withGPT-Neo andRedPajama-
+INCITE for 4 epochs. We set batch size as 8 and leaning rate as 1e−4 on 2
+GPUs. For Pythia, we fine-tune for 2 epochs. Besides, we set batch size as 4
+and keep the learning rate as 1e−4 on 4 GPUs.
+
+As a defense comparing, we choose differential privacy (DP) from open-source
+library pyvacy [28] with a small ϵ = 0.1, i.e. large perturbation. The fine-tuning
+settings are the same as the baselines.
+
+From a defensive ability perspective, we evaluate the above fine-tuned models
+on two state-of-the-art privacy attacks: a data extraction attack (DEA) and a
+membership inference attack (MIA).
+
+DEA needs no access to the trained model under the black-box setting. The
+implemented DEA refers to [5]. The adversary can efficiently extract by querying
+the trained model without any prior knowledge of the training data. We choose
+models which are fine-tuned on AG’s News. Then, we evaluate DEA with these
+fine-tuned models.
+
+Similar to DEA, MIA needs no access to the trained model, either. We imple-
+ment MIA under the black-box setting, which provides a strong adversary and
+an upper bound of privacy loss. The implemented MIA refers to [16], with a pro-
+posal model to generate data. The adversary knows nothing about the trained
+model but only accesses by querying, We evaluate MIA on three datasets.
+
+4.2 Results
+
+We analyze the results with perplexity (PPL), which measures the fine-tuned
+models in its (word) predictions. We score each sample based on the ratio of
+the perplexity after and before lowercasing the original text, we name this ratio
+
+‡ https://huggingface.co/EleutherAI/gpt-neo-2.7B
+§ https://huggingface.co/togethercomputer/RedPajama-INCITE-Chat-3B-v1
+¶ https://huggingface.co/EleutherAI/pythia-6.9B
+
+
+
+Posterior Sampling Based Privacy Enhancer in LLM 7
+
+as Lowercasing. We use Lowercasing as a measurement because it drastically
+alters the perplexity of memorized content, which requires a specific lowercase.
+Besides, we also score the ratio of zlib [9] entropy and the perplexity, we call
+this ratio as Zlibbing. Zlib, as a text compressor, can detect repeated patterns,
+so Zlibbing dramatically alters the perplexity of memorized content, which has
+repeated texts. We choose the top-1 result of each metric, our method has similar
+perplexity compared with the baseline and DP methods. However, our method
+achieve lower ratio both in Lowercasing and Zlibbing, which means our method
+generates efficient content and not potentially memorize training samples. There
+is almost no difference between the different models when comparing baseline,
+DP, and our method with PPL. The results are all close to 1.1. For Lower-
+casing, our method almost has lower values compared with DP. Specifically, in
+RedPajama-INCITE and Pythia onAG’s News, our method achieves 3.062
+and 7.458. However, in GPT-Neo on Wikitext-103, our method achieves the
+highest value of 42.127. For Zlibbing, our method almost achieves lower values
+than DP (See Table 2).
+
+We refer to [16] to analyze the results of MIA. We describe attack perfor-
+mances according to their true positive rates (TPR) under very low false positive
+rates (FPR) by different threshold values. We choose 10%, 1% and 0.1% as our
+target FPR values. The results on different models show that our method has
+a lower TPR compared with the baseline, which means our method is effective
+to defend MIA. In comparison with DP, our method almost gets lower values.
+However, in RedPajama-INCITE and Pythia on AG’s News, DP has bet-
+ter results than our method. The values are even zero when the ratios are 1%
+and 0.1% (See Table 3).
+
+Table 2: PSY against DEA
+
+Score
+AG’s News Twitter Wikitext-103
+
+PPL Lowercasing Zlibbing PPL Lowercasing Zlibbing PPL Lowercasing Zlibbing
+
+Baseline
+GPTNeo
+
+1.030 37.387 18388.217 1.039 36.066 15226.839 1.016 23.143 16881.580
+DP 1.016 39.331 14243.051 1.016 37.708 14165.225 1.016 36.46 13244.788
+Ours 1.016 37.762 14165.508 1.016 37.239 14094.263 1.015 42.127 13942.004
+
+Baseline
+RedPajama
+
+1.136 11.347 3906.395 1.546 4.353 994.626 1.069 1.575 522.252
+DP 1.133 11.788 3115.580 1.135 11.345 3914.205 1.112 12.280 3086.298
+Ours 1.182 3.062 1543.762 1.217 8.116 2742.597 1.456 3.348 1494.253
+
+Baseline
+Pythia
+
+1.049 15.701 11835.779 1.065 20.959 10082.962 1.100 4.038 2577.540
+DP 1.052 15.260 11106.952 1.049 15.406 11848.253 1.068 19.128 9424.102
+Ours 1.077 7.457 8368.949 1.056 20.768 10983.864 1.100 9.836 6732.477
+
+5 Conclusion and Future Work
+
+In this short paper, we propose an efficient module PSY to mitigate memorization-
+related attacks, and the empirical results are mainly positive. On the one hand,
+
+
+
+8 Y. Sun, L. Duan, Y. Li
+
+Table 3: PSY against MIA under different FPR Metrics
+
+False Positive Ratio
+AG’s News Twitter Wikitext-103
+
+10% 1% 0.1% 10% 1% 0.1% 10% 1% 0.1%
+
+Baseline
+GPTNeo
+
+36.23% 14.57% 12.83% 42.37% 4.30% 3.20% 31.53% 1.3% 0.86%
+DP 36.50% 1.43% 1.03% 11.13% 1.67% 0.33% 39.50% 1.43% 1.03%
+Ours 25.73% 0.33% 0.10% 11.16% 0.26% 0.16% 37.66% 9.63% 6.36%
+
+Baseline
+RedPajama
+
+36.03% 11.03% 9.80% 21.33% 0.93% 0.7% 41.50% 18.23% 16.10%
+DP 8.1% 0.0 0.0 7.10% 0.10% 0.07% 41.90% 8.33% 7.60%
+Ours 26.20% 8.73% 7.93% 7.26% 0.1% 0.06% 37.60% 9.83% 6.86%
+
+Baseline
+Pythia
+
+50.90% 10.57% 10.03% 94.80% 47.50% 39.27% 52.50% 12.36% 11.83%
+DP 15.67% 0.0 0.0 7.20% 0.13% 0.10% 43.10% 3.76% 3.36%
+Ours 26.21% 3.40% 2.66% 10.70% 0.50% 0.26% 37.66% 9.63% 6.36%
+
+the current encourages us to investigate whether other LoRA-based fine-tuning
+methods, e.g., AdaLoRA [33] and QLoRA [6] can be composed with PSY and
+ensures privacy protection. On the other hand, we would like to quantify the
+privacy guarantee of PSY further and explore alternative modules that can have
+similar effects.
+
+6 Acknowledgements
+
+This research is fully funded by the European Research Center of Huawei Tech-
+nologies. We thank Ricardo Mendes for the valuable discussion. We thank anony-
+mous reviewers for the various constructive comments and suggestions.
+
+References
+
+1. Achiam, J., Adler, S., Agarwal, S., Ahmad, L., Akkaya, I., Aleman, F.L., Almeida,
+D., Altenschmidt, J., Altman, S., Anadkat, S., et al.: Gpt-4 technical report. arXiv
+preprint arXiv:2303.08774 (2023)
+
+2. Biderman, S., Schoelkopf, H., Anthony, Q.G., Bradley, H., O’Brien, K., Hallahan,
+E., Khan, M.A., Purohit, S., Prashanth, U.S., Raff, E., et al.: Pythia: A suite
+for analyzing large language models across training and scaling. In: International
+Conference on Machine Learning. pp. 2397–2430. PMLR (2023)
+
+3. Black, S., Gao, L., Wang, P., Leahy, C., Biderman, S.: Gpt-neo: Large scale autore-
+gressive language modeling with mesh-tensorflow. If you use this software, please
+cite it using these metadata 58, 2 (2021)
+
+4. Burchard, P., Daoud, A., Dotterrer, D.: Empirical differential privacy. arXiv
+preprint arXiv:1910.12820 (2019)
+
+5. Carlini, N., Tramer, F., Wallace, E., Jagielski, M., Herbert-Voss, A., Lee, K.,
+Roberts, A., Brown, T., Song, D., Erlingsson, U., et al.: Extracting training data
+from large language models. In: 30th USENIX Security Symposium (USENIX Se-
+curity 21). pp. 2633–2650 (2021)
+
+
+
+Posterior Sampling Based Privacy Enhancer in LLM 9
+
+6. Dettmers, T., Pagnoni, A., Holtzman, A., Zettlemoyer, L.: Qlora: Efficient fine-
+tuning of quantized llms. Advances in Neural Information Processing Systems 36
+(2024)
+
+7. Duan, Y.: Privacy without noise. In: Proceedings of the 18th ACM conference on
+Information and knowledge management. pp. 1517–1520 (2009)
+
+8. Fu, W., Wang, H., Gao, C., Liu, G., Li, Y., Jiang, T.: Practical membership infer-
+ence attacks against fine-tuned large language models via self-prompt calibration.
+arXiv preprint arXiv:2311.06062 (2023)
+
+9. loup Gailly, J., Adler, M.: zlib compression library https://github.com/madler/
+
+zlib
+10. Go, A., Bhayani, R., Huang, L.: Twitter sentiment classification using distant
+
+supervision. CS224N project report, Stanford 1(12), 2009 (2009)
+11. Hintersdorf, D., Struppek, L., Kersting, K., Dziedzic, A., Boenisch, F.: Finding
+
+nemo: Localizing neurons responsible for memorization in diffusion models. arXiv
+preprint arXiv:2406.02366 (2024)
+
+12. Hu, E.J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L.,
+Chen, W.: Lora: Low-rank adaptation of large language models. arXiv preprint
+arXiv:2106.09685 (2021)
+
+13. Huang, Y., Gupta, S., Song, Z., Li, K., Arora, S.: Evaluating gradient inversion at-
+tacks and defenses in federated learning. Advances in neural information processing
+systems 34, 7232–7241 (2021)
+
+14. Leino, K., Fredrikson, M.: Stolen memories: Leveraging model memorization for
+calibrated {White-Box} membership inference. In: 29th USENIX security sympo-
+sium (USENIX Security 20). pp. 1605–1622 (2020)
+
+15. Luo, X., Wu, Y., Xiao, X., Ooi, B.C.: Feature inference attack on model predictions
+in vertical federated learning. In: 2021 IEEE 37th International Conference on Data
+Engineering (ICDE). pp. 181–192. IEEE (2021)
+
+16. Mattern, J., Mireshghallah, F., Jin, Z., Schölkopf, B., Sachan, M., Berg-
+Kirkpatrick, T.: Membership inference attacks against language models via neigh-
+bourhood comparison. arXiv preprint arXiv:2305.18462 (2023)
+
+17. Meeus, M., Jain, S., Rei, M., de Montjoye, Y.A.: Did the neurons read your book?
+document-level membership inference for large language models. arXiv preprint
+arXiv:2310.15007 (2023)
+
+18. Merity, S., Xiong, C., Bradbury, J., Socher, R.: Pointer sentinel mixture models.
+arXiv preprint arXiv:1609.07843 (2016)
+
+19. Nasr, M., Carlini, N., Hayase, J., Jagielski, M., Cooper, A.F., Ippolito, D.,
+Choquette-Choo, C.A., Wallace, E., Tramèr, F., Lee, K.: Scalable extraction of
+training data from (production) language models. arXiv preprint arXiv:2311.17035
+(2023)
+
+20. Ren, J., Li, Y., Zen, S., Xu, H., Lyu, L., Xing, Y., Tang, J.: Unveiling and mitigat-
+ing memorization in text-to-image diffusion models through cross attention. arXiv
+preprint arXiv:2403.11052 (2024)
+
+21. Scheliga, D., Mäder, P., Seeland, M.: Precode-a generic model extension to prevent
+deep gradient leakage. In: Proceedings of the IEEE/CVF Winter Conference on
+Applications of Computer Vision. pp. 1849–1858 (2022)
+
+22. Shokri, R., Stronati, M., Song, C., Shmatikov, V.: Membership inference attacks
+against machine learning models. In: 2017 IEEE symposium on security and privacy
+(SP). pp. 3–18. IEEE (2017)
+
+23. Somepalli, G., Singla, V., Goldblum, M., Geiping, J., Goldstein, T.: Understand-
+ing and mitigating copying in diffusion models. Advances in Neural Information
+Processing Systems 36, 47783–47803 (2023)
+
+https://github.com/madler/zlib
+https://github.com/madler/zlib
+
+
+10 Y. Sun, L. Duan, Y. Li
+
+24. Suh, S., Chae, D.H., Kang, H.G., Choi, S.: Echo-state conditional variational au-
+toencoder for anomaly detection. In: 2016 International Joint Conference on Neural
+Networks (IJCNN). pp. 1015–1022. IEEE (2016)
+
+25. Sun, Y., Duan, L., Mendes, R., Zhu, D., Xia, Y., Li, Y., Fischer, A.: Exploiting
+internal randomness for privacy in vertical federated learning. Cryptology ePrint
+Archive (2024)
+
+26. Together.ai.: Redpajama models v1. https://www.together.ai/blog/
+
+redpajama-models-v1 (2024)
+27. Touvron, H., Lavril, T., Izacard, G., Martinet, X., Lachaux, M.A., Lacroix, T.,
+
+Rozière, B., Goyal, N., Hambro, E., Azhar, F., et al.: Llama: Open and efficient
+foundation language models. arXiv preprint arXiv:2302.13971 (2023)
+
+28. Waites, C.: Pyvacy: Privacy algorithms for pytorch. https://github.com/
+
+ChrisWaites/pyvacy
+
+29. Wang, Y., Meng, X., Liu, X.: Differentially private recurrent variational autoen-
+coder for text privacy preservation. Mobile Networks and Applications pp. 1–16
+(2023)
+
+30. Xu, W., Sun, H., Deng, C., Tan, Y.: Variational autoencoder for semi-supervised
+text classification. In: Proceedings of the AAAI Conference on Artificial Intelli-
+gence. vol. 31 (2017)
+
+31. Yeom, S., Fredrikson, M., Jha, S.: The unintended consequences of overfitting:
+Training data inference attacks. arXiv preprint arXiv:1709.01604 12 (2017)
+
+32. Yu, W., Pang, T., Liu, Q., Du, C., Kang, B., Huang, Y., Lin, M., Yan, S.:
+Bag of tricks for training data extraction from language models. arXiv preprint
+arXiv:2302.04460 (2023)
+
+33. Zhang, Q., Chen, M., Bukharin, A., Karampatziakis, N., He, P., Cheng, Y., Chen,
+W., Zhao, T.: Adalora: Adaptive budget allocation for parameter-efficient fine-
+tuning. arXiv preprint arXiv:2303.10512 (2023)
+
+34. Zhang, X., Zhao, J.J., LeCun, Y.: Character-level convolutional networks for text
+classification. In: NIPS (2015)
+
+https://www.together.ai/blog/redpajama-models-v1
+https://www.together.ai/blog/redpajama-models-v1
+https://github.com/ChrisWaites/pyvacy
+https://github.com/ChrisWaites/pyvacy
+
+	Short Paper: PSY: Posterior Sampling Based Privacy Enhancer in Large Language Models
+

@@ -1,0 +1,623 @@
+
+CybORG++: An Enhanced Gym for the Development
+of Autonomous Cyber Agents
+
+Harry Emerson*1,2, Liz Bates*1, Chris Hicks1, and Vasilios Mavroudis1
+
+harry.emerson@bristol.ac.uk, ebates@turing.ac.uk, c.hicks@turing.ac.uk,
+vmavroudis@turing.ac.uk
+
+1The Alan Turing Institute, London, UK
+2University of Bristol, Bristol, UK
+
+Abstract
+
+CybORG++ is an advanced toolkit for reinforcement learning research focused on
+network defence. Building on the CAGE 2 CybORG environment, it introduces
+key improvements, including enhanced debugging capabilities, refined agent im-
+plementation support, and a streamlined environment that enables faster training
+and easier customization. Along with addressing several software bugs from its
+predecessor, CybORG++ introduces MiniCAGE, a lightweight version of CAGE
+2, which improves performance dramatically—up to 1000× faster execution in
+parallel iterations—without sacrificing accuracy or core functionality. CybORG++
+serves as a robust platform for developing and evaluating defensive agents, making
+it a valuable resource for advancing enterprise network defence research.
+
+1 Introduction
+
+As cyberattacks grow more frequent and sophisticated, the need for advanced, autonomous cyberde-
+fence systems is critical. In this evolving landscape, reinforcement learning (RL) has emerged as a
+powerful tool for developing agents capable of protecting enterprise networks. Among the leading
+platforms in this domain, the CAGE 2 CybORG simulator [11] stands out as a widely adopted
+environment for training and evaluating RL-based defensive agents. By simulating realistic network
+attack scenarios, CybORG has become a standard framework within the cybersecurity research
+community, providing a controlled yet dynamic environment for testing defence strategies.
+
+However, as CybORG has gained traction, significant limitations have surfaced. Despite its robustness,
+the platform suffers from persistent software bugs and inefficiencies that undermine its reliability
+as a benchmark for RL agents. These issues, including erratic agent behavior caused by flawed
+code, often lead to inconsistent results, complicating reproducibility. Furthermore, CybORG’s
+architecture—designed with potential future emulation in mind—introduces unnecessary complexity,
+slowing down agent training and making it difficult for developers to debug agent actions. These
+challenges present barriers to progress in developing more capable autonomous defence agents.
+
+In response to these issues, we introduce CybORG++, a comprehensive upgrade to the original
+CybORG platform. CybORG++ improves both the usability and reliability of the environment
+by addressing key bugs and streamlining agent interactions. It includes two major components:
+(1) a debugged version of the original CybORG CAGE 2, and (2) MiniCAGE, a lightweight re-
+implementation that preserves the core functionality while delivering significantly faster execution.
+MiniCAGE allows researchers to conduct large-scale experiments with up to 1000× speed improve-
+ments in parallel execution, drastically reducing the time required for training and evaluation. Addi-
+
+*These authors contributed equally to this work.
+
+
+
+Figure 1: CAGE 2 CybORG Network Diagram. The orange dotted line indicates a shared firewall
+between the User subnet and Enterprise subnet. The red dotted line indicates the defender is not a
+stationary host in the network, and that User0 is where red maintains a foothold on the system whilst
+not functioning as a proper user host.
+
+tionally, an expanded developer guide offers in-depth documentation, providing greater transparency
+and ease of use for future research.
+
+The CybORG++ toolkit represents a substantial improvement over its predecessor, offering re-
+searchers a more efficient and reliable platform for advancing autonomous cyber defence. By
+removing the bottlenecks that have hindered progress, CybORG++ facilitates faster experimentation,
+more accurate benchmarking, and greater confidence in RL-driven defence strategies, ultimately
+bringing the field closer to real-world applications of autonomous cybersecurity.
+
+2 CybORG - CAGE 2 Challenge
+
+The Cyber Operations Research Gym, or CybORG, is an open-source AI gym environment for devel-
+oping blue and red team decision-making agents for cybersecurity tasks [11, 10]. The environment
+is designed to implement a variety of different scenarios, the most notable of which are the CAGE
+challenges [1, 10, 6, 7]. The CAGE challenges are a series of public challenges designed to foster the
+development of autonomous defensive agents.
+
+The first two CAGE challenges use a version of the CybORG environment which is compatible with
+training single defensive agents, whilst the third and fourth challenges focus on training multi-agent
+RL agents. The CAGE 2 Challenge is one of the most widely explored challenges [9, 3, 5, 12, 4, 2]
+and focuses on developing a defensive blue agent able to defend a small enterprise network, seen in
+Figure 1.
+
+2.1 Enhancements
+
+A variety of bugs were identified within the CAGE 2 CybORG environment, many of which affected
+core components of the environment and liked influenced defensive agent strategy. A detailed
+breakdown of the bugs can be found in the associated GitHub repository. The most notable are
+summarised as follows:
+
+• Invalid Actions - Several actions of the blue agent do not function as intended. For instance,
+the decoy for Vsftpd is incorrectly identified as the decoy for Apache, the fermitter decoy
+
+2
+
+
+
+cannot be removed from a host, and certain hosts cannot be exploited by exploits that are
+purportedly compatible.
+
+• Inconsistent Reward Calculation - The reward system for the blue agent is based on the
+number of hosts exploited; however, only specific types of exploits reliably trigger this
+reward.
+
+• Reduced Visibility in Observation - In some cases, the blue agent’s observations fail to
+detect red agent exploitation, resulting in a significantly lower detection rate for certain
+hosts.
+
+2.2 Extended Developer Guide
+
+The CAGE 2 CybORG environment exhibits considerable complexity; consequently, the developer
+guide for the original implementation has been expanded to ensure that all the features of the
+environment remain fully transparent to reinforcement learning (RL) developers. This comprehensive
+guide includes an in-depth explanation of the state, action, and reward components, a detailed analysis
+of the pre-programmed behavior of the red agents, and an extensive reference detailing the interactions
+among various decoys, processes, and exploits across different hosts which can also be seen in the
+tables in appendix. There was not much other literature to cross reference our understanding of the
+system structure, though our perception of the decoy mappings and user processes and ports aligns
+with that of [8].
+
+3 MiniCAGE
+
+MiniCAGE is a lightweight version of CAGE 2 CybORG environment that enhances speed, trans-
+parency, and ease of use while staying true to the original challenge objectives. The package mimics
+the basic RL components of the original environment (e.g. state-action space, reward, etc.), but
+abstracts the bulky files and complex processes, resulting in a streamlined and more accessible
+framework that retains core functionalities.
+
+3.1 Optimisations
+
+The main optimisations introduced by miniCAGE are the following:
+
+• Parallel execution - MiniCAGE supports parallel execution allowing agents to be trained
+and evaluated across thousands of different network configurations simultaneously on a
+single CPU. This modification accelerates mini-CAGE by almost 1000× that of the original
+CybORG environment.
+
+• Red Agent Interface - MiniCAGE can now be used to train both red and blue agents,
+enabling the exploration of more advanced offensive strategies compared to the pre-
+programmed agents in the original CybORG implementation.
+
+• Simplified State-Action Space - Environment inputs and outputs have been vectorised
+to more easily support RL training and evaluation. The default states from the original
+CybORG implementation have been enhanced with additional metrics to track malicious
+scans and decoy placements. The agent action space has been simplified. Decoy actions
+have been streamlined to a single action per host, automatically deploying the strongest
+decoy by default.
+
+3.2 Environment Benchmarking
+
+To explore the speed improvement resulting from MiniCAGE, both environments were run over
+a specified number of iterations with random starting initialisations and input actions. The time
+elapsed between initialisation and completion was then used as a metric of environmental execution
+speed. The results were aggregated over 100 separate instances. MiniCAGE offers significant speed
+improvements over the original CybORG CAGE 2 environment, as evidenced by Figure 2a. Over the
+four iteration intervals, MiniCAGE offers speed improvements of approximately 15×, 65×, 950×
+and 800×, respectively.
+
+3
+
+
+
+1 10 100 1000
+Number of Iterations
+
+10 1
+
+100
+
+101
+
+102
+
+103
+
+Log Episode Runtime (s)
+
+Mini-CybORG
+CybORG
+
+(a)
+
+102 103
+
+CybORG Reward
+
+102
+
+103
+
+Mini-CybORG Reward
+
+ y = 1.00x - 0.74
+Pearson = 1.00 (p<0.01)
+
+(b)
+
+Figure 2: Comparison of the developed MiniCAGE environment to the original CAGE 2 CybORG
+implementation. a) Execution speed improvement of MiniCAGE compared to CAGE 2 CybORG
+environment. MiniCAGE is highlighted to run is approximately 950× faster than CAGE 2 CybORG
+when running over 100 parallel iterations on a single CPU. Error bars show the standard error. b)
+Performance of six attacker-defender pairs in both environments to confirm the equivalence of the
+CybORG CAGE 2 and MiniCAGE environments. The strong correlation in agent behavior observed
+between both environments indicates consistent environmental dynamics.
+
+To verify that MiniCAGE accurately emulates the original CAGE 2 environment, six defender-attacker
+pairs were tested (defenders: react-restore, react-decoy, sleep; attackers: b-line, meander). Each
+agent employs a distinct strategy, ensuring that, together, the agents explore the full state-action
+space. Each agent pair was repeated for 500 episodes for 100 timesteps each. The reward for the
+agent pairs was summed for each episode and used as a metric for agent behaviour. Figure 2b shows
+the equivalence of the two environments and demonstrates a strong correlation in reward (Pearson
+correlation of 1.00 (p < 0.01) and all reward measurements fall well within the standard error of the
+comparison environment.
+
+4 Potential Future Directions
+
+• Community Contribution - CybORG++ is the product of an interdisciplinary effort aimed
+at reigniting interest in the application of reinforcement learning to cybersecurity and network
+defence. We actively encourage community contributions to the repository, particularly
+those that focus on identifying bugs in the CAGE 2 CybORG environment or enhancing the
+functionality of MiniCAGE.
+
+• Extension of MiniCAGE - MiniCAGE’s streamlined design makes it highly adaptable for
+modifications and improvements. Future enhancements could include implementing custom
+network scenarios within the simulator, particularly those replicating more realistic network
+configurations. Additionally, re-writing the environment in JAX could likely lead to further
+performance improvements.
+
+• Comprehensive Benchmarking - Benchmarking within CybORG++ could be enhanced by
+establishing a leaderboard that tracks performance across various cyber defence scenarios.
+This could also involve storing the top-performing models, along with their code and weights,
+within the repository.
+
+4
+
+
+
+5 Codebase
+
+For access to the MiniCAGE environment and a separate debugged version of the existing CAGE 2
+CybORG environment, please see the following repository:
+https://github.com/alan-turing-institute/CybORG_plus_plus
+
+6 Acknowledgements
+
+Research funded by the Defence Science and Technology Laboratory (DSTL) which is an executive
+agency of the UK Ministry of Defence providing world class expertise and delivering cutting-edge
+science and technology for the benefit of the nation and allies. The research supports the Autonomous
+Resilient Cyber Defence (ARCD) project within the Dstl Cyber Defence Enhancement programme.
+
+References
+[1] Cyber autonomy gym for experimentation challenge 1. https://github.com/
+
+cage-challenge/cage-challenge-1, 2021. Created by Maxwell Standen, David Bow-
+man, Son Hoang, Toby Richer, Martin Lucas, Richard Van Tassel.
+
+[2] Andy Applebaum, Camron Dennler, Patrick Dwyer, Marina Moskowitz, Harold Nguyen, Nicole
+Nichols, Nicole Park, Paul Rachwalski, Frank Rau, Adrian Webster, et al. Bridging automated
+to autonomous cyber defense: Foundational analysis of tabular q-learning. In Proceedings of
+the 15th ACM Workshop on Artificial Intelligence and Security, pages 149–159, 2022.
+
+[3] Elizabeth Bates, Vasilios Mavroudis, and Chris Hicks. Reward shaping for happier autonomous
+cyber security agents. In Proceedings of the 16th ACM Workshop on Artificial Intelligence and
+Security, pages 221–232, 2023.
+
+[4] Myles Foley, Chris Hicks, Kate Highnam, and Vasilios Mavroudis. Autonomous network
+defence using reinforcement learning. In Proceedings of the 2022 ACM on Asia Conference on
+Computer and Communications Security, pages 1252–1254, 2022.
+
+[5] Myles Foley, Mia Wang, Zoe M, Chris Hicks, and Vasilios Mavroudis. Inroads into autonomous
+network defence using explained reinforcement learning. In Proceedings of the Conference
+on Applied Machine Learning in Information Security, CAMLIS 2022, Arlington, Virginia,
+USA, October 20-21, 2022, volume 3391 of CEUR Workshop Proceedings, pages 1–19. CEUR-
+WS.org, 2022.
+
+[6] TTCP CAGE Working Group. Ttcp cage challenge 3. https://github.com/
+cage-challenge/cage-challenge-3, 2022.
+
+[7] TTCP CAGE Working Group. Ttcp cage challenge 4. https://github.com/
+cage-challenge/cage-challenge-4, 2023.
+
+[8] Kim Hammar, Neil Dhir, and Rolf Stadler. Optimal defender strategies for cage-2 using causal
+modeling and tree search. arXiv preprint arXiv:2407.11070, 2024.
+
+[9] Chris Hicks, Vasilios Mavroudis, Myles Foley, Thomas Davies, Kate Highnam, and Tim
+Watson. Canaries and whistles: Resilient drone communication networks with (or without) deep
+reinforcement learning. In Proceedings of the 16th ACM Workshop on Artificial Intelligence
+and Security, AISec ’23, page 91–101, New York, NY, USA, 2023. Association for Computing
+Machinery.
+
+[10] Mitchell Kiely, David Bowman, Maxwell Standen, and Christopher Moir. On autonomous
+agents in a cyber defence environment. arXiv preprint arXiv:2309.07388, 2023.
+
+[11] Maxwell Standen, Martin Lucas, David Bowman, Toby J Richer, Junae Kim, and Damian
+Marriott. Cyborg: A gym for the development of autonomous cyber agents. IJCAI-21 1st
+International Workshop on Adaptive Cyber Defense., 2021.
+
+[12] Sanyam Vyas, John Hannay, Andrew Bolton, and Professor Pete Burnap. Automated cyber
+defence: A review. arXiv preprint arXiv:2303.04926, 2023.
+
+5
+
+https://github.com/alan-turing-institute/CybORG_plus_plus
+https://github.com/cage-challenge/cage-challenge-1
+https://github.com/cage-challenge/cage-challenge-1
+https://github.com/cage-challenge/cage-challenge-3
+https://github.com/cage-challenge/cage-challenge-3
+https://github.com/cage-challenge/cage-challenge-4
+https://github.com/cage-challenge/cage-challenge-4
+
+
+7 Appendix
+
+Table 1: Host Details with Ports, Decoys, Decoy Order, and Initial Exploit Order
+
+Host OS Local Ports Decoys Decoy Order Initial Exploit Order
+
+User0 Windows 21, 22 Apache,
+Smss,
+Svchost,
+Tomcat
+
+Svchost - 1
+Smss - 2
+Apache - 3
+Tomcat - 4
+
+FTPDirTraversal (port 21) : 7,
+SSHBruteForce (port 22) : 0.1
+
+User1 Windows 21, 22 Apache,
+Smss,
+Svchost,
+Tomcat
+
+Svchost - 1
+Smss - 2
+Apache - 3
+Tomcat - 4
+
+FTPDirTraversal (port 21) : 7,
+SSHBruteForce (port 22) : 0.1
+
+User2 Windows 445, 139, 135,
+3389
+
+Apache,
+SSHd,
+Tomcat,
+Femitter
+
+SSHd - 0.1
+Apache - 3
+Tomcat - 4
+Femitter - 7
+
+EternalBlue (port 139) : 2,
+BlueKeep (port 3389) : 1
+
+User3 Linux 25, 80, 443,
+3390
+
+SSHd,
+Vsftpd
+
+SSHd - 0.1
+Vsftpd - 7
+
+HarakaRCE (port 25) : 6,
+SQLInjection (port 3390 and
+80/443) : 5,
+HTTPsRFI (port 443) : 4,
+HTTPRFI (port 80) : 3,
+BlueKeep (port 3389) : 1
+
+User4 Linux 22, 80, 3390,
+443, 25
+
+Vsftpd Vsftpd - 7 HarakaRCE (port 25) : 6,
+SQLInjection (port 3390 and
+80/443) : 5,
+HTTPsRFI (port 443) : 4,
+HTTPRFI (port 80) : 3,
+BlueKeep (port 3389) : 1
+
+Ent0 Linux 22 Apache,
+Tomcat,
+Vsftpd,
+HarakaSMPT
+
+Apache - 3
+Tomcat - 4
+Vsftpd - 7
+HarakaSMPT - 6
+
+SSHBruteForce (port 22) : 0.1
+
+Ent1 Windows 22, 135, 3389,
+445, 139, 80,
+443
+
+Femitter Femitter - 7 HTTPsRFI (port 443) : 4,
+HTTPRFI (port 80) : 3,
+EternalBlue (port 139) : 2,
+BlueKeep (port 3389) : 1,
+SSHBruteForce (port 22) : 0.1
+
+Ent2 Windows 22, 135, 3389,
+445, 139, 80,
+443
+
+Femitter Femitter - 7 SSHBruteForce (port 22) : 0.1
+
+6
+
+
+
+Table 1: (Continued) Host Details with Ports, Decoys, Decoy Order, and Initial Exploit Order
+
+Host OS Local Ports Decoys Decoy Order Initial Exploit Order
+
+Op_host0 Linux 22 Apache,
+HarakaSMPT,
+Tomcat,
+Vsftpd
+
+Vsftpd - 7
+HarakaSMPT - 6
+Tomcat - 4
+Apache - 3
+
+SSHBruteForce (port 22) : 0.1
+
+Op_host1 Linux 22 Apache,
+HarakaSMPT,
+Tomcat,
+Vsftpd
+
+Vsftpd - 7
+HarakaSMPT - 6
+Tomcat - 4
+Apache - 3
+
+SSHBruteForce (port 22) : 0.1
+
+Op_host2 Linux 22 Apache,
+HarakaSMPT,
+Tomcat,
+Vsftpd
+
+Vsftpd - 7
+HarakaSMPT - 6
+Tomcat - 4
+Apache - 3
+
+SSHBruteForce (port 22) : 0.1
+
+Op_Server Linux 22 Apache,
+HarakaSMPT,
+Tomcat,
+Vsftpd
+
+Vsftpd - 7
+HarakaSMPT - 6
+Tomcat - 4
+Apache - 3
+
+SSHBruteForce (port 22) : 0.1
+
+Table 2: Exploits, Decoys, and Processes
+
+Exploits Decoys Processes
+
+EternalBlue decoySmss smss.exe
+
+BlueKeep decoySvchost svchost.exe
+
+HTTPRFI decoyApache apache2
+
+HTTPSRFI decoyTomcat tomcat8.exe
+
+SSH BruteForce decoySSHD sshd.exe/sshd
+
+SQL Injection - mysql
+
+Haraka RCE decoyHarakaSMTP smtp
+
+FTP Directory Traversal decoyFemitter
+decoyVsftpd
+
+femitter.exe
+
+Table 3: Hostname, Ports, Users, and Processes
+
+Hostname Ports Users Processes
+
+User1 22,
+21
+
+SSHD_SERVER,
+SYSTEM
+
+SSHD.EXE,
+FEMITTER.EXE
+
+7
+
+
+
+Table 3: (Continued) Hostname, Ports, Users, and Processes
+
+Hostname Ports Users Processes
+
+User2 445, 139,
+135,
+3389
+
+SYSTEM,
+SYSTEM,
+NETWORK
+
+SMSS.EXE,
+SVCHOST.EXE,
+SVCHOST.EXE
+
+User3 3389,
+80, 443,
+25
+
+ROOT,
+WWW-DATA,
+ROOT
+
+MYSQL,
+APACHE2,
+SMTP
+
+User4 22,
+3390,
+80, 443,
+25
+
+ROOT,
+ROOT,
+WWW-DATA,
+ROOT
+
+SSHD,
+MYSQL, APACHE2,
+SMTP
+
+Ent0 22 ROOT SSHD.EXE
+
+Ent1 22,
+135,
+3389,
+445, 139,
+80, 443
+
+SSHD_SERVER,
+SYSTEM,
+SYSTEM,
+SYSTEM,
+NETWORK
+
+SSHD.EXE,
+SVCHOST.EXE,
+SVCHOST.EXE,
+SMSS.EXE,
+TOMCAT8.EXE
+
+Ent2 22,
+135,
+3389,
+445, 139,
+80, 443
+
+SSHD_SERVER,
+SYSTEM,
+SYSTEM,
+SYSTEM,
+NETWORK
+
+SSHD.EXE,
+SVCHOST.EXE,
+SVCHOST.EXE,
+SMSS.EXE,
+TOMCAT8.EXE
+
+Op_Server 22 ROOT SSHD
+
+Op_host0 22 ROOT SSHD
+
+Op_host1 22 ROOT SSHD
+
+Op_host2 22 ROOT SSHD
+
+Defender 22,
+53, 78
+
+ROOT,
+SYSTEMD+
+
+SSHD,
+SYSTEMD
+
+8
+
+
+	Introduction
+	CybORG - CAGE 2 Challenge
+	Enhancements
+	Extended Developer Guide
+
+	MiniCAGE
+	Optimisations
+	Environment Benchmarking
+
+	Potential Future Directions
+	Codebase
+	Acknowledgements
+	Appendix
+

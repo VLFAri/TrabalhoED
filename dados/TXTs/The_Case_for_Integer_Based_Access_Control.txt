@@ -1,0 +1,2136 @@
+
+IBAC Mathematics and Mechanics
+The Case for ‘Integer Based Access Control’
+Data Security in the Age of AI and AI Automation
+
+Mark Stocks
+Email: mark.stocks@canberra.edu.au
+
+ORCID: 0000-0001-9155-4276
+
+Canberra University
+
+October 28, 2024
+
+Abstract
+Current methods for data access control, especially in regards to AI and AI automation face
+unique challenges in ensuring appropriate data access. We introduce Integer-Based Access Control
+(IBAC), addressing the limitations of Role-Based Access Control (RBAC) and Attribute-Based
+Access Control (ABAC). IBAC’s mathematical foundations enable its application to relational and
+NoSQL databases and document authorisation. We demonstrate IBAC’s suitability for filtering
+relational database row-level information as well as AI prompt search results, particularly in restricting
+AI/NLP access based on separation of duty, supporting both need-to-know and need-to-share data
+restrictions.
+
+IBAC uses security tokens, integers that represent aggregated security attributes. These tokens
+maintain orthogonality across encoded attributes, but are stored as integers for fast real-time vector
+comparison and efficient dominance testing. This mechanism allows high-speed row-level result
+filtering, ensuring unauthorised records are excluded before results reach the requester.
+
+We extend the Bell-LaPadula model by incorporating a ’process constraint’, overcoming RBAC/ABAC
+limitations with reduced complexity, increased flexibility, and enhanced performance in data filtering.
+Our theorems demonstrate the extended Dominance relationship, facilitating rapid federated authorisation
+across diverse databases and file systems.
+
+This work reaffirms the practical strength of the Bell-LaPadula model in data security through
+(1) our mathematical extension, (2) a novel IBAC security attribute encoding scheme, and (3) a
+simplified dominance testing mechanism of security tokens without decoding.
+
+1 Background
+In today’s zero-trust cyber environment, data security is paramount, as both external and internal
+threats continually challenge organisations. Traditional security measures often fail, especially against
+internal threats that emerge once an outsider breaches initial defences. This paper introduces Integer-
+Based Access Control (IBAC) to enhance data security, particularly in AI and automation contexts.
+
+Historically, business and IT leaders have focused on perimeter defences, guided by industry advice.
+However, the increasing frequency of data breaches shows that this approach is insufficient. Data
+breaches typically follow a two-step process: an external attack breaches the perimeter (often through
+phishing), and the intruder then acts as an internal threat, similar to a rogue employee.
+
+Although external attacks are concerning, the real risk arises when external attacks evolve into insider
+threats. Many organisations overlook this two-step process, finding that the internal threat is too
+complex to address with the known complexities of exiting access controls.
+
+Access control involves two main processes: authentication and authorisation. Authentication verifies
+the user’s identity through credentials, which form the first layer of security. Authorisation determines
+
+1
+
+
+what authenticated users can access based on predefined policies such as RBAC, ABAC, or MAC.
+Current practices rely heavily on Active Directory and application functionality, which often leave data
+vulnerable.
+
+This paper advocates for stronger internal data authorisation controls. We propose IBAC as a robust and
+simpler method to enforce zero trust at the data level, ensuring data protection even if authentication
+or application security is compromised. IBAC provides an independent layer of defence, enforcing need-
+to-know and need-to-share principles for data access.
+
+Our focus is on inward-focused authorisation controls, critiquing existing mechanisms (RBAC, ABAC,
+CapBAC), and presenting IBAC as a superior alternative for secure, efficient data access management.
+By implementing IBAC, we demonstrate a significant improvement in data authorisation, reducing
+complexity, and enhancing security within organisations.
+
+1.1 Role-Based Access Control (RBAC) limitations
+RBAC assigns permissions based on roles and is widely used, but has significant constraints. It often
+provides excessive access to senior technical personnel and does not prevent data exfiltration through
+backdoors or compromised accounts. RBAC is effective for role-based access control, but was never
+designed for fine-grained data access control. We will see that IBAC extends RBAC, creating a hybrid
+approach. IBAC provides a more detailed and fine-grained access control, that limits access to senior
+technical personnel and is designed to close back doors and stop data exfiltration.
+
+1.2 Active Directory (AD) limitations
+AD extends RBAC but still inherits its fundamental weaknesses, particularly in managing granular data
+access and integrating with modern security needs.
+
+1.3 Attribute-Based Access Control (ABAC) limitations
+ABAC [8, 9] offers more granular control by evaluating multiple attributes. IBAC was developed to
+overcome the limitation of ABAC, so it deserves a little more attention to understand limitations.
+ABAC implementation is complex, performance-intensive, and lacks standardisation, making it difficult
+for large organisations to adopt and maintain effectively. Limitations include:
+
+• High Initial Effort: Defining attributes, establishing policies, and integrating with existing systems
+require significant upfront work.
+
+• Maintenance Complexity: Developing and maintaining attribute schemas and policies is resource-
+intensive.
+
+• Performance Bottlenecks: Real-time evaluation of access requests can be computationally intensive,
+leading to performance issues.
+
+• Scalability Issues: The system may struggle to handle high volumes of access requests and complex
+evaluations.
+
+• Standardization and Compatibility: Lack of widely accepted standards can cause compatibility
+issues between different systems and implementations.
+
+• Vendor Integration Challenges: Integrating ABAC solutions from different vendors can be difficult.
+
+• Specialized Knowledge Required: Administrators and policy creators need specialized skills to
+manage ABAC systems effectively.
+
+• Policy Validation: Extensive testing and validation are needed to ensure policies do not result in
+unintended access.
+
+• Legacy System Integration: Integrating with legacy systems may require substantial modifications.
+
+2
+
+
+
+• Hybrid Environment Complexity: Managing access control in environments combining ABAC with
+other models like RBAC adds complexity.
+
+1.4 Capability-Based Access Control (CapBAC) limitations
+CapBAC [10, 11] has a concept of security tokens, similar to IBAC, so it deserves a little more attention
+as well. CapBAC provides a flexible and decentralised way to manage access control using tokens that
+specify access rights. However, CapBAC also has numerous limitations, here are some of the limitations
+of CapBAC:
+
+• Life-cycle Management: Managing the life-cycle of capability tokens (issuance, renewal, revocation,
+and expiration) can be complex, especially in large-scale systems.
+
+• Token distribution: Ensuring that tokens are securely distributed and stored is challenging, as
+tokens can be susceptible to theft or misuse if not properly protected.
+
+• Token explosion: In systems with a vast number of resources and users, the number of tokens that
+need to be managed can become very large, leading to potential scalability issues.
+
+• Token Security Risks: If a capability token is stolen or intercepted, it can be used by an unauthorized
+party to access resources. This makes the secure handling and transmission of tokens critical.
+
+• Security Handing Overheads: Ensuring the integrity and authenticity of tokens often requires
+cryptographic measures, which can introduce additional overhead and performance degradation.
+
+• Complicated Governance: While CapBAC allows for fine-grained access control, defining and
+managing the granularity of capabilities can be cumbersome.
+
+• Unauthorised Access Risks: Delegating capabilities must be carefully controlled to prevent unauthorized
+access through improper delegation.
+
+• Integrating CapBAC: Integrating CapBAC with existing access control systems and policies can
+be challenging. It requires a shift in how access control is conceptualized and implemented.
+
+• Cognitive load: Users and administrators must understand and correctly handle capability tokens,
+which can increase the cognitive load and potential for errors.
+
+1.5 Integer Based Access Control (IBAC) and it’s Trusted-System linage
+Against this backdrop, we discuss and look at the details of integer-based attribute control (IBAC)
+compared to RBAC, ABAC, and CapBAC, and we demonstrate that IBAC addresses the major limitations
+of the other methods above.
+
+Historically Trusted Systems, particularly Multilevel Security (MLS) systems, were based on the Bell-
+LaPadula and Biba mathematical models. Eventually, attribute-based access control (ABAC) and
+capability-based access control (CapBAC) were developed to address perceived limitations and inflexibilities
+of traditional Trusted Systems based on these earlier models.
+
+We argue that moving away from the mathematically sound trusted Bell-LaPadula and Biba models
+to build access control systems like ABAC and CapBAC, which lack a solid mathematical foundation,
+was a mistake. Instead, extending the Bell-LaPadula and Biba mathematics to enhance robustness and
+introduce flexibility should have been the focus.
+
+ABAC and CapBAC are based on testing and verification. The absence of a mathematical basis for the
+ABAC and CapBAC models means that each time a policy is defined, there is a risk of inadvertently
+introducing a backdoor or security vulnerability in the ABAC/CapBAC framework. However, this is
+not the case for the Bell-LaPadula and Biba trust models.
+
+3
+
+
+
+The access control models post Trusted-Systems Bell-LaPadula and Biba that we have discussed, i.e.,
+ABAC, CapBAC, have had little impact todate in addressing global challenges of managing the growing
+wave of cybersecurity threats that result in data exfiltration. We observe a steady rise in data breaches,
+prompting governments to respond with continuous legislation.
+
+We would argue the original trusted system Bell-Lapadual and Biba models was sound, and at the
+heart of the model, more than capable in solving the authorisation problem, but the implementation
+of the mathematical model was flawed. Trusted systems have been around since the 1970s with little
+impact on the global problems that we face today in terms of managing the ever-increasing wave of cyber
+security threats. Over the years, a lot of “off-the-cuff” criticism has been leveled at the trusted system
+and MLS approach, specifically how inflexible and nonperforming the method is. We disagree with that
+assessment and show in this paper that the issue with the trusted system, specifically Bell-Lapadual
+and Biba, has not been the mathematical model, but the traditional implementation using bit vectors.
+The bit-vector implementation might be easy to deploy, but it is easy to hack, it is inflexible, and ends
+up being overly complicated.
+
+The mathematical models of the Bell-LaPadula and Biba trusted system [2, 3] are complete and
+consistent. Typically, the issues which have arisen have arisen during the implementation of the models.
+The implementation problems have not been the sets of semantics and mathematical rules to enable
+trust, but rather the underlying data structures behind the rules are bit-vectors to represent categorical
+data.
+
+The lack of uptake and efficacy of the Trusted System control over the years is primarily due to the
+inflexibility and maintenance complexity of using a simplistic use of bit-vectors when implementing the
+trusted systems model.
+
+We introduce the concept of security tokens that encode various security attributes as vectors of integers
+that can be aggregated by summation or multiplication. These aggregated security tokens possess
+mathematical properties that maintain orthogonality across encoded attribute elements. Each element
+in the vector represents categorical security data, which can be easily decoded when required. The
+test of dominance between security tokens is facilitated by a simple aggregate operation, allowing
+high-performance filtering or switching without the need to decode the vectors. These tokens, while
+individually maintaining orthogonality across the encoded attributes that constitute a token, are stored
+and manipulated in their aggregated integer form, enabling efficient identification of overlaps between
+the aggregate security tokens. If overlaps are NOT detected between a user security token, who is
+requesting information, and the information security token, i.e., a zero subset exits between User and
+Information, then access is denied.
+
+We have named this method Integer-Based Access Control (IBAC). This approach addresses the flexibility
+and complexity issues of earlier trusted systems and overcomes all the limitations of RBAC, ABAC, and
+CapBAC discussed earlier in the paper. In essence, IBAC surpasses the implementation limitations of
+bit vectors by utilising a superior bit vector abstraction while maintaining the performance advantages
+of raw bit vectors. When used in a trusted system, with some mathematical modifications to the
+model, trusted systems and MLS can overcome past limitations and provide a powerful tool for user
+authorisation to data and information.
+
+Trusted systems could then be used as a highly performant, robust, and ubiquitous preventative
+authentication control, enabling trust on zero-trusted data sources by providing appropriate separation
+of duties based on user role separation when accessing data.
+
+The area of interest and application of IBAC technology in this paper, i.e., the use case, includes the
+Relational Database Management System, and the data filtering for various Natural Language Processing
+(NLP) and AI retrieval methods. I.e., a focus on data protection for when using methods such as inverted
+lists and vector embeddings.
+
+When we developed IBAC to resolve the authorisation data access control problem, a simple premise
+was devised: individuals within an organisation without authorisation to access certain portions of a
+’data set’ within a data source, whether it be a relational database, NoSQL database, vector database,
+file system, or even a message in a message queue, should have the unauthorised rows, documents, or
+messages filtered out before any data are returned in response to a query. Furthermore, the enforcement
+
+4
+
+
+
+of access policies should be governed by a unified set of policy rules applicable to all data holdings in
+the organisation, ensuring consistency in authorisation and access control.
+
+For any organisation only one single policy, i.e., set of trusted system access rules, should drive the
+access or denial of ’information’ requested by each ’user’, across all of the various sources of information
+held by that organisation.
+
+A set of corporate policy rules and supporting technology should be provided to allow access authorisation
+at the lowest level of granularity across any application, database, messaging layer, and network. All
+authorisation access to the data should be governed by a single policy across the entire technology stack.
+
+Historically, after a user gains authenticated access to an application, we rely on the application
+functionality to ensure that access is appropriate in terms of separation of duty and need-to-know.
+The big idea and paradigm shift in this paper are two-fold.
+
+Firstly, in addition to verification through application code testing, the IBAC model is mathematically
+sound, in contrast to ABAC and CapBAC. The completeness and consistency of the mathematical
+model ensure that as the organisation creates the data security policy, it is encoded in the technology,
+maintaining complete and consistent mathematical relations throughout the technology stack. This
+means that the policy is devised with confidence, free of security holes, and created in alignment with
+the organisational policy. Any change is an extension, an addition, rather than requiring extensive
+maintenance and code changes.
+
+Secondly, IBAC shifts the responsibility for authorisation and data access from the application layer
+to the database layer. Traditionally, when access is managed at the application layer, it is merely
+hoped that application developers get the coding process right through extensive testing. In contrast
+to Application Code, IBAC provides controlled access through a central policy that is easily distributed
+across the technology stack. This approach ensures that a single policy is embedded and implemented
+within the fabric of each specific technology in the stack.
+
+The authorised user’s access should be established on a need-to-know corporate policy basis, and then
+encoded into the data itself. Plus, the implementation should be a simple control through a generic
+function that would allow or deny access based on the users ’need-to-know’, enforcing clear separation
+of duty of users.
+
+1.6 IBAC principles
+As stated earlier in developing IBAC, the traditional ’rules-based’ direct semantic implementation (for
+ABAC) using bit-vectors was abandoned because of the inherent inflexibility, complexity, and lack of
+performance due to problems with sparse arrays of the bit-vectors. An abstraction of the bit vectors
+was instead developed, replacing the semantic bit vector with orthogonal integer encoded tokens, plus a
+generic dominance relation that exploited the orthogonality properties between the user (Subject) and
+information (Object) to deny or allow access requests. The approach developed, “orthogonal encoding”
+and the mechanics are described in this paper, and it is an abstraction of the bit vector and is empirically
+superior for implementing the trusted system.
+
+As a metaphor if the reader is familiar with the concept of arithmetic coding for lossless compression,
+then “Orthogonal Encoding” is a good parallel.
+
+2 Classical Implementation of the Trusted System
+Starting with the classical model of the "trusted system" and the definition of the dominance relation,
+the paper uses the Amoroso [4] style of discrete mathematical description as the basis for the security
+model description for the trusted system semantics. A Subject is defined as a request by some user of
+
+user role to gain access to system information or resources An Object is defined as a system repository
+
+where information or resources are stored made available for access by the Subject Security labels are
+
+the primary meta-data semantics associated with either a Subject or Object.
+
+5
+
+
+
+• Users as Subjects are holders of a clearance token, i.e. a set of semantic labels, to gain access to
+Objects in terms of the need-to-know and the need-to-share.
+
+• The information Objects and the resource are held within a system repository and are pieces of
+information that are tagged with metadata, a set of semantics, a security label, to control Subject′s
+access to the information.
+
+• Object labels (implemented as security tokens) can be viewed as the policy that filters the User
+object′s request (also a security token) by a mathematical relation called a dominance relation.
+
+• If the dominance relation holds on a request, a user Subject gains access to the information
+(Object resource), else if the dominance relation is false, access to the resources is denied to the
+user.
+
+2.1 Security Dominance Relation definition
+What separates IBAC and trusted systems from ABAC and CapBAC is the mathematical model and
+in particular the mathematics of dominance.
+
+The dominance function is a fine-level granular filtering function that works by checking to see if the
+user has a directed path to the data object that is being protected and requested by the user. In graph
+theory, dominance refers to the relationship between nodes (vertices) in a directed graph (digraph).
+
+Dominance is defined from graph theory: node a dominates node b if every control flow path from the
+entry node of the graph to node b must pass through node a
+
+diagram-1 graph dominance is True
+
+The above is an example of testing for dominance (dominance relation), that is, testing that there is a
+directed path between Subject, the user, and Object, the data being requested. In the above case, such
+a path exists, so the dominance relation between that user and object is True.
+
+If the path cannot be traversed, we say that there is no dominance relation between the user and the
+object. Therefore, any request from the user is denied.
+
+6
+
+
+
+diagram-2 graph dominance is False
+
+In the second case above, the dominance test fails because there is no directed graph (no path) between
+the user and the object. In the example the user cannot traverse the graph to the Object and so access
+is denied to that User for that object. in this case the dominance relation between that user and object
+is False.
+
+In summary Dominance is a graph concept which asks the question, can the user requesting access get
+to the label protecting data through a directed path.
+
+2.2 Flattening the dominance structure - Proof of Equivalence Between
+Graph Dominance and Set Inclusion using a set encoding method
+
+All dominance testing methods are based on a flat dominance structure. Let us look at the first step
+of flattening the dominance structure by proving that hierarchical dominance in the directed graph is
+equivalent to a flattened structure, i.e., the subset relationships using a set encoding structure to provide
+set inclusion.
+
+2.2.1 Directed Graph Dominance
+
+Let G = (V,E) be a directed graph with vertices V and edges E. For nodes u, v ∈ V , u → v indicates
+that u dominates v.
+Dominance: Node u dominates node v if every path from the start node s to v must go through u.
+
+2.2.2 Set Encoding
+
+Each node u ∈ V is encoded as a set S(u) ⊆ V , where S(u) contains u and all nodes dominated by u.
+The sets follow the subset relationship: S(u) ⊇ S(v) if and only if u→ v.
+
+7
+
+
+
+2.2.3 Proof of Equivalence
+
+We need to show that for any nodes u, v ∈ V :
+
+u→ v in the graph G if and only if S(u) ⊇ S(v) in the set encoding.
+
+2.2.4 1. Graph Dominance Implies Subset Relationship
+
+Assumption: u→ v
+To Prove: S(u) ⊇ S(v)
+By definition, u→ v means every path from the start node s to v includes u. Therefore, v and all nodes
+dominated by v are included in the set S(u). Hence, S(u) includes S(v), which means S(u) ⊇ S(v).
+
+2.2.5 2. Subset Relationship Implies Graph Dominance
+
+Assumption: S(u) ⊇ S(v)
+To Prove: u→ v
+By definition, S(u) ⊇ S(v) means that every node in S(v) is also in S(u). This implies that all nodes
+dominated by v are also dominated by u. Therefore, u must dominate v in the graph G, i.e., u→ v.
+
+2.2.6 Application to Given Hierarchical Labels
+
+Given the nodes topSecret, Secret, and Public:
+
+topSecret→ Secret
+
+Secret→ Public
+
+Set encoding:
+
+S(topSecret) = {topSecret, Secret,Public}
+
+S(Secret) = {Secret,Public}
+
+S(Public) = {Public}
+
+We show:
+
+topSecret→ Secret =⇒ S(topSecret) ⊇ S(Secret)
+
+S(topSecret) = {topSecret, Secret,Public}
+
+S(Secret) = {Secret,Public}
+
+{topSecret, Secret,Public} ⊇ {Secret,Public}
+
+Secret→ Public =⇒ S(Secret) ⊇ S(Public)
+
+S(Secret) = {Secret,Public}
+
+S(Public) = {Public}
+
+{Secret,Public} ⊇ {Public}
+
+Thus, the hierarchical dominance in the graph is equivalently represented by the superset relationships
+in the set encoding.
+
+2.2.7 Conclusion
+
+We have shown that for any nodes u and v:
+
+• If u→ v in the graph, then S(u) ⊇ S(v) in the set encoding.
+
+• If S(u) ⊇ S(v) in the set encoding, then u→ v in the graph.
+
+Therefore, the hierarchical dominance in the directed graph is equivalent to the superset relationships
+in the set encoding.
+
+8
+
+
+
+2.3 Trusted System Security Policy - Mathematical Schema label definition
+Now that dominance has been defined, and we show how it is flattered, we provided an articulated
+example that follows a familiar scenario of metadata security labels and how these labels are used to
+provide access by a trusted system. We introduce the following label categories; security levels known
+as levels and security agencies known as categories, or as compartments. Both are used to articulate
+the security semantics of the security model, which forms the organisational security policy. To help the
+reader, the following terms can be interchanged:
+
+• Categories and Compartments.
+
+• Subject and User
+
+• Object and Information
+
+• Semantics and Labels
+
+A Security label is defined as follows:
+
+labels = levels× ℘(categories)
+
+That is, the set of labels is equal to a cross product of the set of levels’ and the power set of ’categories’
+
+The ’level’ is a member of a set of classifications like ‘TopSecret’, ‘Secret’ or ‘Protected’ such that ordered
+pairs exist, that make up the graph.
+
+TopSecret ≥ Secret ≥ Protected ≥ Public
+
+The category is a member of a power set of need-to-know / need-to-share ’compartments’ like ‘GCHQ’,
+‘MI5’, ‘MI6’.
+
+{GCHQ,MI5,MI6}
+
+An example of one particular security schema, known as a security policy might be :
+
+levels = {TopSecret, Secret, Protected, Public}
+compartments = {GCHQ,MI5,MI6}
+℘(compartments) = {∅, {GCHQ}, {MI5}, {GCHQ,MI5}........etc}
+
+Continuing the example; three of the possible security label instances from levels × ℘(compartments)
+that create the security policy include:
+
+(TopSecret, {GCHQ,MI5}) (Secret, {GCHQ,MI5,MI6}) (Public, {GCHQ})
+
+A binary relation on the set of ordered pair labels called dominates is then introduced. I.e. a subset of
+the cross product of labels× labels:
+
+Subject ⊆ labels ∧Object ⊆ labels
+
+When an ordered pair of labels (Subject, Object) is an element of the dominant set of labels, we say
+that a dominance relation exists.
+
+(Subject, Object) ∈ dominate
+
+When an ordered pair of labels (Subject, Object) is not an element of the set of labels that dominates,
+we say that a dominance relation does not exist.
+
+(Subject, Object) /∈ dominate
+
+The dominance relation itself is defined as follows:
+
+∀(x1 ∈ Subjects, x2 ∈ Objects) : (x1, x2) ∈ dominates ⇐⇒
+levels(x1) ≥ levels(x2) ∧ compartments(x1) ⊇ compartments(x2)
+
+9
+
+
+
+The dominance relation that is true is a binary relation (a, b) on the set of labels such that when the
+relation is maintained, the level of a is greater than (or equal) to the level of b and the compartments
+of a are a superset of the compartments of b
+
+Hence, the following are all statements of the dominance binary relation from the security schema
+previously defined:
+
+((Secret, {GCHQ,MI5,MI6}), (Secret, {MI6})) ∈ dominates
+
+((TopSecret, {MI6}), (Secret, {MI5})) /∈ dominates
+
+Note: the second example above is false, i.e. ((TopSecret, {MI6}), (Secret, {MI5})) /∈ dominates as
+the object’s compartment MI5 /∈ in (TopSecret, {MI6}) of the subject.
+
+2.4 Simplification of the Trusted System security policy by set Inclusion
+and a simple test for subset between user and object
+
+There are many performance challenges when implementing a classical model of a “dominance relation”
+using a set of semantic rules.
+
+The first step is the classical semantic model itself can be easily mathematically reduced by set inclusion.
+
+As we have proven by the carefully encoding of the security labels; the dominance relation can be
+reduced to a pure subset.
+
+A finite set of A labels is “included” in the set B of labels (a subset of B), A ⊆ B, if and only if the
+cardinality of the A and B intersection is equal to the cardinality of A[5].
+
+A ⊆ B iff (A ∩B = A)
+
+In addition, for any set of security labels S, the property of the inclusion relation in the set is a partial
+order of ℘(S), that is, a partial order of the power set of S.
+
+A ≤ B ⇐⇒ A ⊆ B
+(a,b) = {{a}, {a, b}}
+
+Extending the example above, the set of levels levels = TopSecret ≥ Secret ≥ Protected ≥ Public is
+in fact an inclusion:
+
+{TopSecret, Secret,Protected,Public}
+⊇ {Secret,Protected,Public}
+⊇ {Protected,Public}
+⊇ {Public}
+
+{{TopSecret, Secret, Protected, Public} ⊇ {Secret, Protected, Public} ⊇ {Protected, Public} ⊇ {Public}}
+
+The complete security scheme then showing the inclusion of the security levels joined with the compartments
+becomes:
+
+{{TopSecret, Secret, Protected, Public} ⊇ {Secret, Protected, Public} ⊇ {Protected, Public} ⊇ {Public}}
+∪ {GCHQ,MI5,MI6}
+
+By careful semantic encoding, the dominance relation can then be reduced to just testing for subsets of
+levels and subsets of compartments:
+
+∀(x1 ∈ Subjects, x2 ∈ Objects) : (x1, x2) ∈ dominates ⇐⇒
+(levels(x1) ⊇ levels(x2) ∧ compartments(x1) ⊇ compartments(x2)
+
+The implication for the efficient implementation of the dominance relation is then a simple test for
+subsets.
+
+(SecLabels = levels ∪ compartments) ∧
+
+10
+
+
+
+∀(x1 ∈ Subjects, x2 ∈ Objects) : (x1, x2) ∈ dominates ⇐⇒ (SecLabels(x1) ⊇ SecLabels(x2)
+
+The reduction of the dominance relation to a simple test for subsets after carefully encoding the security
+labels provides massive performance gain when implementing the dominance relation using aggregate
+functions, which will be discussed later in the paper.
+
+3 IBAC Process Dominance - Extending the trusted system’s
+model
+
+We made the point earlier that moving away from the mathematically sound trusted Bell-LaPadula
+and Biba models to build access control systems such as ABAC and CapBAC, which lack a solid
+mathematical foundation, was a mistake. Instead, extending the Bell-LaPadula and Biba mathematics
+to enhance robustness and introduce flexibility should have been the focus.
+
+From now on, when we refer to Bell-LaPadula, we refer to Bell-LaPadula including the Biba model as
+well.
+
+We outline an approach here to extend Bell-LaPadula based on some mathematical research that was
+developed in the 1990s (see Hargraves).
+
+Hargraves makes the point in his master’s dissertation that Bell-LaPadula can be made more flexible if
+both the Subject dominates the Object and the Process dominates the Object.
+
+This is an interesting philosophical shift. The argument being a Subject can only gain access to an
+Object by some Process, so why is the Process itself not part of the dominance relation and not part of
+the Bell-LaPadula trusted system model.
+
+Hargraves [12] indicates that both the Subject and the Process should dominate the object
+
+We will show that by adding the additional process constraint to the Bell-LaPadula model, the model
+becomes much more flexible and addresses the original disadvantages of Bell-LaPadula that led to the
+development of ABAC and CapBAC.
+
+We describe the extended Bell-LaPadula model and the associated proof using category theory [7].
+Category theory is an abstraction of the predicate logic that enables us to express more efficiently and
+succinctly the necessary mathematics.
+
+The key point to the Bell-LaPadula extension is that we introduce one-to-one (bijective) relationship
+mappings between the "Subject" and a "Process" which enables greater flexibility in the model when
+accessing "objects".
+
+So in addition to user as the Subject mapped to the Object, we also have combinations of Subjects and
+Processes, as tuples mapped to the object.
+
+For example, (”user1”, ”printer”, ”secret”) and (”user2”, ”briefing_room”, ”topsecret”).
+
+So in addition to a Subject in this case, the User dominating the Object, so does the (User, Process )
+tuple dominate the object.
+
+For example, g : ("user1", "printer", "top secret")→ ("object1", "secret") where g ∈ dominates.
+
+and
+
+f : ("user2", "printer", "secret")→ ("object2", "top secret") where f /∈ dominates
+
+A more formal definition with proof of the extended Bell-LaPadula is as follows.
+
+3.1 One-to-One "Subject" and a "Process" (Bijective) Relationship
+The key to the Bell-LaPadula extension is to introduce a bijection between Subject (S) and Process (P ).
+In category theory, the bijective relationship can be represented with a commutative diagram showing
+
+11
+
+
+
+that a morphism f : S → P has an inverse g : P → S such that g ◦ f = ids and f ◦ g = idp:
+
+S P
+
+S P
+
+f
+
+g
+
+idS idP
+
+This diagram indicates that g ◦ f = idS and f ◦ g = idP , demonstrating that f is bijective.
+
+This can then be used to extend the use cases where Bell-LaPadula with the additional Process constraint
+provide greater flexibility in terms of how the model can be used for access control.
+
+From an implementation perspective of the bijective relationships, the User/Process mappings are setup
+as tuples (user, process) by the organisation, mappings prior to any usage .
+
+3.2 Formal definition Bell-LaPadula Extension with example problem-1 of
+a secret printer printing lower classification documents
+
+3.2.1 Problem Statement
+
+• Process P : ’Printer’ with classification ’Top Secret’
+
+• Subject U : ’User’ with ’Top Secret’ clearance wants to print a ’document’.
+
+• Object O: ’Document’ being requested for printing is ’Public’
+
+According to the Bell-LaPadula/Biba model, a ’Top Secret’ process like a printer should not write to
+print a ’Public’ object like a document.
+
+From an infrastructure perspective, this is a financial waste to double or even triple infrastructure costs.
+
+The problem can be overcome by extending Bell-LaPadula/Biba to include an additional process dominance
+relation, in this case the printer being the process that also dominates the object.
+
+3.2.2 Solution
+
+• There exists a 1-to-1 mapping between the user u and the process p,
+denoted as (U,P, "User/Process classification"). These 1-to-1 mappings are setup prior to when
+access is required by the user and setup by an independent 3rd party administrator based on
+appropriate change control for that organisation.
+
+• This mapping allows the user U to use the printer P for writing (printing a document), assuming
+that the user U has an appropriate classification and dominates the object.
+
+• Commutativity:
+
+U → P (User has the allowed access to the Printer, set up prior as a bijection tuple)
+P → O (the user/printer bijection tuple has allowed access to write to the Object)
+U → O (The user has direct read access, i.e., they dominate the document)
+
+3.2.3 Formalization in Category Theory
+
+Definitions and Notations
+
+Objects:
+
+• UP = {(U,P, "User/Process classification")} (Set of users in context and their associated processes)
+
+• U = {(P, "User classification")} (Set of users and their classifications)
+
+• O = {(O, "Object classification")} (Set of objects and their classifications)
+
+12
+
+
+
+Morphisms:
+
+• y : U → UP (Mapping from Users to Users in context of Processes, bijective)
+
+• y−1 : UP → U (Inverse mapping from Users in context of Processes to Users)
+
+• f : UP → O (Mapping from Users in context of Processes to Objects)
+
+• h : U → O (Composite mapping from Users to Objects, defined as h = f ◦ y, for allowed write
+access via the printer)
+
+• d : U → O (Direct mapping from Users to Objects, assuming allowed User read access)
+
+Compositionality and Commutativity
+
+• The composite function h is defined as h = f ◦ y.
+
+• Commutativity ensures that:
+
+h(U) = f(y(U))
+
+This means:
+
+h(U, "User classification")dom(O, "Object classification")
+
+if:
+
+f((U,P, "User/Process classification"))dom(O, "Object classification")
+
+and:
+
+d((U, "User classification"))dom(O, "Object classification")
+
+• Conditional access: The user U can access the object O assuming direct read access via d allowing
+indirectly write access via H using a secret printer for lower-classified documents.
+
+Commutative Diagram
+
+U UP O
+
+U
+
+y
+
+h
+
+d
+
+f
+
+y−1
+
+h
+
+This diagram represents the commutative properties of the mappings, ensuring that U → P and P → O
+commute properly to allow U → O.
+
+Thus, the user U writes the object O assuming they have (1) direct read access dominance and (2)
+through the combination (user / printer) write access process through P , depending on the conditions
+set by the access control policies of the tuples specified of the bijective mappings of the user and process
+combinations, for example (user1, printer1).
+
+3.3 Formal Definition Bell-LaPadula Extension with Example Problem-2 of
+a Briefing Room
+
+3.3.1 Problem Statement
+
+• Process R: Briefing room to brief low-ranking officers
+
+• High-ranking officer H: Holds a plan P at ’Top Secret’
+
+• Low-ranking officer L: Can’t see the plan P as his ranking is only ’Secret’
+
+In the briefing room R, the high-ranking officer H who holds the plan P can disclose the plan P to the
+low-ranking officer L while in the room R.
+
+13
+
+
+
+3.3.2 Solution
+
+• Tuples: (H,R) and (L,R), both are allowed in the room for briefings. setup prior by an
+Administrator.
+
+• Mappings:
+
+– k : H → P (High-ranking officer H has prior access to the plan P , i.e., dominates)
+– f : (H,R)→ P (High-ranking officer H can disclose the plan in the room R)
+– h : (H,R)→ (L,R) (High-ranking officer H in the room R can disclose to low-ranking officer
+
+L in the room R)
+– Therefore, j : (L,R)→ P (Low-ranking officer L can see the plan in the room R)
+
+3.3.3 Formalization in Category Theory
+
+Definitions and Notations
+
+Objects:
+
+• HR = {(H,R, "High-ranking officer/Room classification")} (Set of high-ranking officers in context
+and their associated rooms)
+
+• LR = {(L,R, "Low-ranking officer/Room classification")} (Set of low-ranking officers in context
+and their associated rooms)
+
+• H = {(H, "High-ranking officer classification")} (Set of high-ranking officers and their classifications)
+
+• L = {(L, "Low-ranking officer classification")} (Set of low-ranking officers and their classifications)
+
+• P = {(P, "Plan classification")} (Set of plans and their classifications)
+
+Morphisms:
+
+• y : H → HR (Mapping from high-ranking officers to high-ranking officers in context of rooms,
+bijective)
+
+• y−1 : LR → H (Inverse mapping from low-ranking officers in context of rooms to high-ranking
+officers)
+
+• f : HR→ P (Mapping from high-ranking officers in context of rooms to plans)
+
+• h : H → LR (Mapping from high-ranking officers to low-ranking officers in context of rooms)
+
+• j : LR→ P (Mapping from low-ranking officers in context of rooms to plans)
+
+• k : H → P (Mapping from high-ranking officers who have prior access to the plan)
+
+Compositionality and Commutativity
+
+• The composite function h is defined as j ◦ h = f ◦ y.
+
+• Commutativity ensures that:
+
+f(y(H,R) = j(h(L,R))
+
+This means:
+
+h(L,R, "low-ranking officer/Room classification")dom(P, "Plan classification")
+
+if:
+
+f((H,R, "High-ranking officer/Room classification"))dom(P, "Plan classification")
+
+and:
+
+k((H"High-ranking officer"))dom(P, "Plan classification")
+
+• Conditional access: The low-ranking officer L can see the plan P in the room R, given the context
+and classification constraints.
+
+14
+
+
+
+3.3.4 Commutative Diagram
+
+H HR P
+
+LR
+
+y
+
+h
+
+k
+
+f
+
+y−1
+
+j
+
+This diagram represents the commutative properties of the mappings, ensuring that H → R and R→ P
+commute properly to allow L→ P in the room R.
+
+Thus, the high-ranking officer H discloses the plan P to the low-ranking officer L within the briefing
+room R, assuming the high-ranking officer H has (1) direct classification dominance and (2) conditional
+access within the context of the room exists for both the high-ranking officer H and the low-ranking
+officer L.
+
+4 Implementation of dominance
+
+4.1 The problem of bit-vector implementation
+Bit-vectors would seem a natural fit for implementing the notion of trust by substituting each security
+semantic for a bit position in the bit-vector. In fact, the observation of inclusion that (A ⊆ B) iff (A∩
+B = A) can be directly and easily applied to build a dominance relation between two bit-vectors A and
+B. This is the classical way of encoding and testing security tokens for dominance.
+
+In this paper only two sets of bit-vectors of (user, object) are used in this for the demonstration and
+testing of dominance between (user, object).
+
+In terms of bit-vector testing for Dominance, the user only obtains access to information if the relation
+(A ⊆ B) iff (A ∩B = A) of the bit-vectors hold
+
+Their are two relations used in this paper time and again for demonstration and being tested using
+different encoding techniques to ensure (user, object) ∈ dominates are as follows:
+
+• ((Secret, {MI5,MI6}), (Secret, {MI5})) ∈ dominates
+
+shown in its included form: ({Secret, Protected, Public} ∪ {M15,MI6}), ({Secret} ∪ {MI5}) ∈
+dominates
+
+• ((Secret, {MI5,MI6}), (Secret, {GCHQ,MI6})) /∈ dominates
+
+shown in its included form: ({Secret, Protected, Public}∪{MI5,MI6}), ({Secret}∪{GCHQ,MI5}) /∈
+dominates
+
+It is important to note the following in regard to the examples above:
+
+• Only the Subject i.e. the User needs to be in the ’included form’ as the User′s label are the
+markings in terms of a holder of a clearance level that contains access to other clearance levels,
+and so on, i.e., hierarchical levels for user label markings.
+
+• On the other hand the Object, the marking on the Information is tagged with only a singular
+level in terms of it’s classification marking (TopSecret ∨ Secret ∨ Protected ∨ Public). There is
+no concept of hierarchical levels for information label markings.
+
+• The two dominance relations above will be used throughout the whole paper, to help articulate
+the various dominance mechanics and options, i.e.:
+
+– ’P_rel’ [∈ dominates], i.e. ((Secret, {MI5,MI6}), (Secret, {MI5})) ∈ dominates and
+
+– ’N_rel’ [/∈ dominates], i.e. ((Secret, {MI5,MI6}), (Secret, {GCHQ,MI6})) /∈ dominates
+
+15
+
+
+
+4.1.1 Dominance binary relation implementation as bit-vector boolean operations
+
+The dominance relation is implemented for bit-vectors as a boolean operator, and is a function that
+applies the conjunctive, i.e., the ’and’ operator, and then post the application of the ’and’ operator,
+then a test, if the resultant bit-vector of user ∧ object = object, then user is granted access, else user
+access is denied.
+
+P_rel:
+Access Granted user object1 user ∧ object1 = object1
+Top secret 0 0 0
+Secret 1 1 1
+Protected 1 0 0
+Public 1 0 0
+GCHQ 0 0 0
+MI5 1 1 1
+MI6 1 0 0
+
+Figure-1: Boolean dominance operation of:
+((Secret, {MI5,MI6}), (Secret, {MI5})) ∈ dominates
+
+Note: Column(object1) = Column(user ∧ object1 = object1)
+
+N_rel:
+Access Denied user object2 user ∧ object2 ̸= object2
+Top secret 0 0 0
+Secret 1 1 1
+Protected 1 0 0
+Public 1 0 0
+GCHQ 0 1 0
+MI5 1 0 0
+MI6 1 1 1
+
+figure-2: boolean dominance operation of:
+((Secret, {M15,MI6}), (Secret, {GCHQ,MI6})) /∈ dominates
+
+Note1: Column(object2) ̸= Column(user ∧ object2 ̸= object2)
+
+Note2: The resultant vector does not signal in itself the relation ¬dominate, It is a secondary post
+binary operation of comparison that signals that (User,Object) /∈ dominates
+
+bit-vectors have been the typical encoding scheme for implementing trusted systems for the last 50
+years. bit-vectors represent the simplest of encoding scheme. On face value, they appear as a pragmatic
+and straightforward encoding scheme that one could ever envisage. Each bit indicates a security label
+semantic being set either to “off” or “on”. It would appear that bit-vectors are just a simple representation
+of a set of categorical data.
+
+The trusted system semantics is certainly categorical; however, the need for a highly performant
+implementation such as filtering billions of rows in a database, and the continual maintenance of billions
+of rows in a database, might not make the bit-vector a great choice.
+
+4.1.2 bit-vectors are easy to hack
+
+The first problem with bit-vectors is that they are too easy to hack. A bit patten of all 1’s for the User
+will dominate any Object. Hence the problem of circumventing dominance when using bit-vectors is
+very real. Any Mersenne number (2p − 1) will be a bit pattern of all 1’s that will dominate any other
+bit pattern of the same or lesser array size. See section 4 above, A ⊆ B iff ((A ∩B = A).
+
+Object 1 above is dominated by the Mersenne number (27−1), i.e. [1, 1, 1, 1, 1, 1, 1] [TopSecret, Secret, Protected, Public,GCHQ,MI5,MI6] ⇐⇒
+[1, 1, 1, 1, 1, 1, 1]
+
+[TopSecret, Secret, Public,MI5,MI6] ⇐⇒ [0, 1, 0, 0, 1, 0, 1]
+
+[1, 1, 1, 1, 1, 1, 1] ∧ [0, 1, 0, 0, 1, 0, 1] = [0, 1, 0, 0, 1, 0, 1]
+
+16
+
+
+
+Strict controls of managing Subject and Object bit-vectors are therefore necessary for any implementation
+to ensure the user role profiles and information markings are never tampered with or made public. All
+Subjects and Objects (bit-vector) at rest without encryption can be compromised.
+
+Even more restrictive is the bit-vectors can never be transmitted without encryption being employed as
+an additional layer of control. Leading to performance overheads that will be experienced immediately
+when testing for dominance.
+
+The reader will see later with the Orthogonal Encoding methods; The hacking problem disappears to
+the extent that Orthogonal Encoding is more secure when storing and transmitting security tokens.
+
+4.1.3 bit-vectors are difficult to manage and maintain and there is a sparse array problem
+to overcome
+
+Typically in any large organisation, there may be 100+ bits or more to manage, i.e., the bit
+representations of the various security semantics. As the enterprise security policy gets more complex,
+more and more bits are then required, and they need to be managed.
+
+The second problem is you need to manage both the 1s and 0s in the bit-vector. You end up managing
+the inefficiencies of a sparse array of bits.
+
+The reader will see later with the Orthogonal Encoding methods, that the sparse array problem
+disappears.
+
+4.1.4 What happens when you want to exceed the size of the bit-vector
+
+Closely aligned with 4.1.3, is a bit management issue. What happens when the bit-vector of a particular
+size (vector length) that has been implemented across all of your code, in all your security products,
+now needs just one extra bit? You are forced to recode and then recompile your entire code base.
+
+The reader will see later with the orthogonal encoding methods that the vector length problem also
+disappears.
+
+5 Bit-vector Orthogonal Subspaces of security vectors - the first
+step in fast implementation methods
+
+5.1 bits as unit vectors
+The security bit-vector can be considered from the perspective of linear algebra. By definition, each
+possible bit combination of a position of 1 with all other positions set to 0, can be interpreted as a unit
+vector. Unit vectors providing the basis of a vector space for the security ’domain of discourse’.
+
+For example, assuming three security semantics of ’A’, ’B’ and ’C’, and then binary encoding of these
+three semantics [A = 001, B = 010, C = 100], the binary encoding will result in three bit-vectors. The
+bit-vectors can be viewed as three unit vectors [[0, 0, 1], [0, 1, 0], [1, 0, 0]] , these unit vectors can then be
+considered the basis of a vector space R3 that stands for a universe of discourse for a set of security
+semantics, in this case ’A’, ’B’ and ’C’.
+
+By definition each of the three encodings [[0, 0, 1], [0, 1, 0], [1, 0, 0]] are orthogonal to any other. A good
+question then is, comparing the user bit-vector with an object bit-vector is it possible to utilize the linear
+algebra convention of orthogonality to help in the determination of the dominance between bit-vectors?
+
+It turns out that by using the complement of the user bit-vector, the concept of orthogonality can be
+directly applied to test for dominance by the use of the dot product.
+
+5.2 Dot Product as a test of Dominance
+Using the complement of the user bit-vector, and the dot product operstion, a direct test of orthogonality
+signifies dominance between user and object. That is, the dot product can be directly applied as a test
+for the dominance relation, a • b =
+
+∑n
+i=1 aibi = a1b1 + a2b2 + ... anbn
+
+17
+
+
+
+P_rel: The rationale for P_rel is as follows in the case where the dominance relation is found between
+user and object :
+
+If the relation of dominance holds for (user, object1) ∈ dominate, then as object1 is a subset of user,
+there must be zero overlap with the bit ’complement of the user’ (userC)
+
+The diagram below indicates that the "proper subset" using the vector dot product function expects
+the result to be zero
+
+i.e. userC • object1 = 0
+
+Access Granted user userC object1 userC • object1
+Top secret 0 1 0 0
+Secret 1 0 1 0
+Protected 1 0 0 0
+Public 1 0 0 0
+GCHQ 0 1 0 0
+MI5 1 0 1 0
+MI6 1 0 0 0∑
+
+bits⇒=⊥ 0
+figure-3: boolean dominance operation using dot product
+userC • object1 = 0 : ((Secret, {MI5,MI6}), (Secret, {MI5})) ∈ dominates
+
+N_rel: Conversely, the rationale for N_rel is as follows in the case where the dominance relation
+between the user and object does not hold:
+
+If the relation of dominance does not hold for (user, object2) /∈ dominate, then as object2 overlaps with
+the user set, there will be an encroachment (an overlap) with the ’complement of the user’ (userC)
+
+The diagram below indicates the encroachment in userC using the vector dot product function expecting
+the result being greater than zero.
+
+i.e. userC • object2 > 0
+
+Access Denied user userC object1 userC • object2
+Top secret 0 1 0 0
+Secret 1 0 1 0
+Protected 1 0 0 0
+Public 1 0 0 0
+GCHQ 0 1 1 1
+MI5 1 0 0 0
+MI6 1 0 1 0∑
+
+bits⇒≠⊥ 1
+figure-4: boolean dominance operation using dot product
+userC • object2 = 1 : ((Secret, {MI5,MI6}), (Secret, {GCHQ,MI6})) /∈ dominates
+
+18
+
+
+
+What the orthogonal discussion tells us is as follows, in addition to looking at bit-vectors in a boolean
+logic sense, bit-vectors are subject to the mathematical laws of linear algebra. This can be exploited
+to test for dominance by using a simple dot product operation between the complement of User and
+Object. If an encroachment exists in the set userc, i.e., userC •object > 1, then by definition the binary
+dominance relation does not hold.
+
+There is a deeper level of connection between Boolean logic and the dot product. It can be observed
+from the above two figures 3 & 4 that (a1b1 + a2b2 + ... anbn = a • b), where a = userc and b = object,
+such that there exists the following conjecture, (ux.ox ∈ userC • object) =(u ∈ userC ∧ o ∈ object). The
+proof is as follows:
+
+5.2.1 proof: Dot Product as a Dominance Test - Equivalence between Logical Expressions
+for user ∧ object1 = object1 and userC • object1 = 0, Plus user ∧ object2 ̸= object2 and
+userC • object2 = 1
+
+We aim to prove the first equivalence between the two logical expressions:
+first between user ∧ object1 = object1 and userC • object1 = 0, and then
+second between user ∧ object2 ̸= object2 and userC • object1 = 1.
+
+5.2.2 Definitions and Initial Setup for userC • object1 = 0
+
+• userC : The complement of user, representing all elements not in user.
+
+• Dot Product: In this context, it is a boolean operation indicating the intersection. For boolean
+values, A •B = 1 if both A and B are 1; otherwise, it is 0.
+
+• Conjunction: ∧ represents the logical AND operation.
+
+5.2.3 Proof Steps for - userC • object1 = 0
+
+We need to show that:
+
+user ∧ object1 = object1 ⇐⇒ userC • object1 = 0
+
+5.2.4 Proof
+
+Forward Direction: user ∧ object1 = object1 =⇒ userC • object1 = 0 Assume user ∧ object1 =
+object1.
+
+• This means every element in object1 is also in user. Formally, ∀x(x ∈ object1 =⇒ x ∈ user).
+
+• The complement userC consists of elements not in user. Therefore, x /∈ userC for any x ∈ object1.
+
+• Since no element of object1 is in userC , the intersection of userC and object1 is empty: userC ·
+object1 = 0.
+
+Backward Direction: userC•object1 = 0 =⇒ user∧object1 = object1 Assume userC•object1 = 0.
+
+• This means there is no element in object1 that is also in userC . Formally, ∀x(x ∈ object1 =⇒
+x /∈ userC).
+
+• Since x /∈ userC for any x ∈ object1, it follows that x ∈ user.
+
+• Therefore, every element in object1 is in user, which means user ∧ object1 = object1.
+
+5.2.5 Definitions and Initial Setup for userC • object2 = 1
+
+• userC : The complement of user, representing all elements not in user.
+
+• Dot Product: In this context, it is a boolean operation indicating the intersection. For boolean
+values, A •B = 1 if both A and B are 1; otherwise, it is 0.
+
+• Conjunction: ∧ represents the logical AND operation.
+
+19
+
+
+
+5.2.6 Proof Steps for - userC • object2 = 1
+
+We need to show that:
+
+user ∧ object2 ̸= object2 ⇐⇒ userC • object2 = 1
+
+5.2.7 Proof
+
+Forward Direction: userC •object2 = 1 =⇒ user∧object2 ̸= object2 Assume userC •object2 = 1.
+
+• This means there exists at least one element in object2 that is also in userC . Formally, ∃x(x ∈
+object2 ∧ x ∈ userC).
+
+• Since x ∈ userC , it follows that x /∈ user.
+
+• Therefore, not every element in object2 is in user, which means user ∧ object2 ̸= object2.
+
+Backward Direction: user ∧ object2 ̸= object2 =⇒ userC • object2 = 1 Assume user ∧ object2 ̸=
+object2.
+
+• This means there exists at least one element in object2 that is not in user. Formally, ∃x(x ∈
+object2 ∧ x /∈ user).
+
+• Since x /∈ user, it follows that x ∈ userC .
+
+• Therefore, there is at least one element in object2 that is in userC , which means userC ·object2 = 1.
+
+5.2.8 Conclusion
+
+By proving both directions for both expressions, we have shown the equivalence:
+
+user ∧ object1 = object1 ⇐⇒ userC • object1 = 0
+
+and
+
+user ∧ object2 ̸= object2 ⇐⇒ userC • object2 = 1
+
+holds. A valid test for Dominance can be performed by a dot product between the User and the Object.
+
+6 IBAC Security Label Encoding for Orthogonality and Dominance
+implemented as Aggregate functions for massive performance
+enhancement
+
+In the last section, we have shown that the dot product can be used as a test of dominance. The dot
+product is an interesting construct; there exists an algebraic and a geometric definition.
+
+We discussed earlier the dot product and the use of it for dominance from an algebraic perspective. The
+question then to ask; is it possible to look at its geometric definition in the context of a trusted system,
+i.e., whether we can also use it for testing for dominance?
+
+a • b =
+f
+a
+
+f f
+b
+f
+cos(θ)
+
+On the left-hand side of the equal symbol, there is an operator that algebraically operates on each
+of the elements of the two vectors to test for orthogonality. We looked at this earlier from a boolean
+perspective. The ’left-hand’ side, in a sense, is in the world of a vector space for the security ’domain
+of discourse.’
+
+On the right-hand side of the equal symbol, there is its geometric interpretation as an angle between
+two absolute numerical values, each representing the vector lengths of both a and b. ’The ’right-hand
+side’ of the equation is the length, the aggregate value that creates the geometric interpretation of
+orthogonality, or of being perpendicular.
+
+20
+
+
+
+Let’s use the right-hand side geometric definition insight of the dot product as an analogy, to see if
+other mathematical aggregate structures exist that enable a way of testing for dominance. I.e., by a
+right-hand side test for orthogonality, between the two vectors a User and bObject.
+
+The research carried out over the years has led to the development of two orthogonal encoding methods
+that are analogous to the geometric definition of orthogonality; both have a left and right-hand side
+to the definition.
+
+Before explaining the encoding methods, it is worth knowing that Donald Knuth [6] uses the perpendicular
+symbol between two integers to signify that they are relatively prime, a ⊥ b. Knuth sees two integers
+that are relative prime to each other as also orthogonal under the operation of multiplication.
+
+Taking the following three prime numbers in a set as an example {7, 11, 13}. Any combination of the
+three primes, only used once, is a unique number under the
+
+∏
+product operation, i.e. all combinations
+
+of the power set are orthogonal to each other under multiplication.
+
+Integers can also be orthogonal to each other under the operation of
+∑
+
+addition. The unix / linux
+chmod operation uses this exact concept with the various combinations taken from the set {20, 21, 22} ,
+for the read, write, execute combinations for file access control.
+
+Extending this further, taking randomly any combinations of unique integers from a set that are
+exponents to some common base, the combination under addition will be unique and they will behave
+as a ⊥ b
+
+Using the following set of three exponents as an example {31, 35, 37} any combination of the three, only
+used once, is a unique number under the sum
+
+∑
+operation. I.e., just like the unix chmod operation, the
+
+various combinations are orthogonal to each other.
+
+What is interesting is that when using the developed addition and multiplication orthogonal encoding
+schemes, like the dot product, there is a left and right hand side, respectively a vector and and aggregate
+of the vector:
+
+• Under addition, the left hand side of the vector [31, 35, 37] becomes the right hand aggregate of
+31 + 35 + 37 = 2433
+
+• Under multiplication, the left hand side vector [7, 11, 13] becomes the right hand aggregate of
+7 ∗ 11 ∗ 13 = 1001
+
+The benefit of these orthogonal encoding schemes is the problems of bit-vectors regarding trusted systems
+as described in prior section 4 cease to exist.
+
+7 IBAC Orthogonal Addition encoding dealing with the problem
+of sparse arrays
+
+7.1 The mechanics of addition encoding
+Let us look in detail at the first Orthogonal Encoding method, developed as an alternative to bit-vectors,
+integer exponents to some common base.
+
+Continuing the discussion using the security example from above, the set of labels for the universe of
+security discourse is defined as follows:
+
+Security Label semantic integerToken
+Top secret 30
+
+Secret 31
+
+Protected 32
+
+Public 33
+
+GCHQ 34
+
+MI5 35
+
+MI6 36
+
+21
+
+
+
+figure-5: A set of exponents for the universe of discourse
+
+Orthogonal addition encoding is defined as N =
+∑k=n
+
+k=0 (Ckb
+k), such that N ∈ Z+*, Ck ∈ {0, 1} and
+
+b ≧ 2
+
+P_rel: Orthogonality still applies as a test of dominance on the left-hand-side of the dot product, so
+using the orthogonal complement Userc for each User results in:
+
+Access Granted user userC object1 userC • object1
+Top secret 0 30 0 0
+Secret 31 0 31 0
+Protected 32 0 0 0
+Public 33 0 0 0
+GCHQ 0 34 0 0
+MI5 35 0 35 0
+MI6 36 0 0 0∑
+
+exponents⇒=⊥ 0
+figure-6: exponent dominance operation of: ((Secret, {MI5,MI6}), (Secret, {MI5})) ∈ dominates
+
+N_rel: and also where dominance does not apply such that access is denied results in :
+
+Access Denied user userC object1 userC • object1
+Top secret 0 30 0 0
+Secret 31 0 31 0
+Protected 32 0 0 0
+Public 33 0 0 0
+GCHQ 0 34 34 38
+
+MI5 35 0 0 0
+MI6 36 0 36 0∑
+
+exponents⇒≠⊥ 38
+
+figure-7: exponent dominance operation of: ((Secret, {M15,MI6}), (Secret, {GCHQ,MI6})) /∈ dominates
+
+7.2 Aggregate Value of sum of exponents - the right hand side
+The structure of the addition aggregate is of the form:
+A ∈ Z+∗, A = bn + (bn−1 ∨ 0) + (bn−2 ∨ 0)...+ (b0 ∨ 0) where b is some radix value and n is the largest
+integer index in the set of semantics being encoded.
+
+The addition aggregate function is analogous to
+f
+a
+
+f f
+b
+f
+cos(θ). The left hand side of the equal sign is
+
+the vector, i.e. a vector list of exponents of some common base. The right hand side of the equal sign
+is the encoding summation of all the exponents of some common base. [bn, (bn−1 ∨ 0), (bn−2 ∨ 0), ...(b0 ∨
+0)]left hand side where b
+
+n + (bn−1 ∨ 0) + (bn−2 ∨ 0)...+ (b0 ∨ 0)right hand side is the aggregate
+
+The right-hand side aggregate function calculates the ’addition’ orthogonal value and provides:
+
+• The aggregate value, such that when the value is decoded using the deconstruct function below
+(Algorithm 1), a list of exponents that were initially encoded is returned.
+
+• When testing for dominance, a variation of Algorithm 1, (i.e., Algorithm 2) Compares orthogonality
+for the various vector elements as they are decoded.
+
+In the case of the figure-6, ((Secret, {MI5,MI6}), (Secret, {MI5})) ∈ dominates : ([31+32+33+35+
+36]user = 1011user, [31 + 35]object = 246object) ∈ dominates
+
+In the case of the figure-7, ((Secret, {M15,MI6}), (Secret, {GCHQ,MI6})) /∈ dominates : ([31 +32 +
+33 + 35 + 36]user = 1011user, [31 + 34 + 36]object = 813object) /∈ dominates
+
+22
+
+
+
+7.3 Dealing with sparse arrays of bit-vectors
+We have discussed the importance of orthogonality on the left-hand side as an alternative test for
+dominance, but why the right-hand side aggregate representation?
+
+It turns out that most trusted systems are practical problems involving sparse arrays. This is a subtle
+but important point. Many organisations have many security markings available, but only a few are
+ever combined at any point in time for combinations of (User,Object). If implemented as bit-vectors
+then there are many 0’s to manage.
+
+If an aggregate function that keeps the notion of orthogonality can be found, such as ’addition’ of
+exponents to some base, then it is not required to deal with the zero positions of the vectors. The sparse
+array problem goes away.
+
+All operations, comparative to bit-vectors on average are simplified and are N
+2 , as the zero positions
+
+don’t form part of the encoding. I.e. all operations on an aggregate encoding holding on average N
+2
+
+elements and will then provide a performance gain with a reduction in complexity.
+
+Avoiding the problem of sparse array inefficiencies then makes the maintenance of the aggregate security
+tokens very simple to manage. In relation to the Orthogonal Addition encoding, simple operations of
+addition and subtraction are used to maintain security tokens. Adding and subtracting the various
+semantics as required, which provides the abstraction of the actual bit-vectors.
+
+7.4 Aggregate dominance
+It is one thing to encode the security semantics; it is another to decode the semantics to test for
+dominance efficiently.
+
+As it turns out, there is a simple iterative function for decoding in any base that can be slightly modified
+to then test for dominance.
+
+The iterative function for decoding orthogonal addition is based on the following numerical observation:
+
+xn+1 = xn − basefloor(logbase(xn)) such that xn+1 ≥ 1
+
+The simplified complexity of the above iteration is related to N
+2 on average as the semantics that were
+
+zero were never encoded, and are therefore never encountered when decoded.
+
+For example the object ((Secret, {MI5})object aggregate of 31 + 35 = 24610 will decode as follows:
+
+xn+1 = xn − basefloor(logbase(xn)) 310 = 24610 − 3floor(log3(24610) = 24610 − 35, i.e., the first index is 5
+0 = 310 − 3floor(log3(310) = 310 − 31, i.e., the second index is 1 An array of indices [5, 1]3 is returned
+
+The full code for decoding or deconstruct, i.e. the name of the algorithm, is as follows:
+
+Algorithm 1 deconstruct(input: aInteger, base)
+iArray ← []
+temparyInteger ← aInteger
+while temparyInteger ≥ 1 do
+
+index← floor(logbase(temparyInteger))
+iArray.append(index)
+temporaryInteger ← temporaryInteger − baseindex
+
+return iArray
+
+As long as the indices used for encoding are unique, never repeated, this algorithm’s complexity is
+O2logN
+
+2 removing the constant OlogN , on average only N
+2 operations are required. The dominance
+
+relation itself is almost as simple:
+
+23
+
+
+
+Algorithm 2 dominance(input: aInteger, bInteger, base)
+temparyIntegerA← aInteger
+temparyIntegerB ← bInteger
+while temparyIntegerA ≥ 1 do
+
+indexA← floor(logbase(temparyIntegerA))
+while temparyIntegerB ≥ 1 do
+
+indexB ← floor(logbase(temparyIntegerB))
+if indexA > indexB
+
+break from loop
+else if indexA = indexB
+
+temporaryIntegerB ← temporaryIntegerB − baseindexB
+
+break from loop
+else return −1 #dominate relation is false between aInteger and bInteger
+
+temporaryIntegerA← temporaryIntegerA− baseindexA
+
+return 0 #dominance relation holds between aInteger and bInteger
+
+The expectation of the inner loop when testing for dominance (Algorithm 2) between aInteger, bInteger,
+is that the control flow will break on each iteration of the inner loop for dominance to hold
+
+As long as each index is used only once (the critical assumption of the working dominance algorithm) ,
+regardless of the base, this algorithm is extremely fast, it’s complexity the same as Algorithm 1 OlogN
+
+Using the knowledge that the index sum operation
+∑
+
+is a combination of orthogonal integers with the
+ability to quickly decode the aggregate results in a useful security abstraction of the bit-vector.
+
+An abstraction that can be applied to any layer in the technology stack to provide authorisation for
+access:
+
+• Rows in the RDBMS
+
+• Records in a file System
+
+• Documents in noSQL database
+
+• messages in a message broker
+
+• Even the OS file system
+
+As interesting as Orthogonal addition encoding is, the gold standard in terms of performance from the
+research was when testing for dominance using the orthogonal prime number encoding scheme.
+
+8 IBAC Orthogonal Prime Number encoding
+
+8.1 The mechanics of Products of primes encoding
+The second method developed for trusted systems was to utilize prime numbers. Continuing again
+with both Donald Knuth’s use of the perpendicular symbol for relative primes, a ⊥ b and the previous
+security example from above; the set of labels for the universe of security discourse can be defined as
+follows:
+
+Security Label semantic integerToken
+Top secret 3
+Secret 5
+Protected 7
+Public 11
+GCHQ 13
+MI5 17
+MI6 19
+
+figure 8: A set of prime numbers for the universe of discourse such that each prime is also orthogonal
+(perpendicular) to each other.
+
+24
+
+
+
+The prime number encoding method is the gold standard method, testing for the dominance relation is
+trivial once the orthogonal encoding is in-place
+
+Orthogonal multiplication encoding is defined as N =
+∏k=n
+
+k=1 (Pk), such that N ∈ Z+*, Pk ∈ {primes}
+and Pk ≧ 2
+
+P_rel:
+
+Orthogonality still applies as a test of dominance using the dot product between the UserC and Object
+:
+
+Access Granted user userC object1 userC • object1
+Top secret 0 3 0 0
+Secret 5 0 5 0
+Protected 7 0 0 0
+Public 11 0 0 0
+GCHQ 0 13 0 0
+MI5 17 0 17 0
+MI6 19 0 0 0∑
+
+primes⇒=⊥ 0
+figure 9: prime number dominance operation of: ((Secret, {MI5,MI6}), (Secret, {MI5})) ∈ dominates
+
+N_rel:
+
+and also where dominance does not apply using the dot product such that access is denied:
+
+Access Denied user userC object1 userC • object2
+Top secret 0 3 0 0
+Secret 5 0 5 0
+Protected 7 0 0 0
+Public 11 0 0 0
+GCHQ 0 13 13 169
+MI5 17 0 0 0
+MI6 19 0 19 0∑
+
+primes⇏=⊥ 169
+figure 10: prime number dominance operation of: ((Secret, {M15,MI6}), (Secret, {GCHQ,MI6})) /∈
+dominates
+
+8.2 Aggregate Value of product of primes - the right hand side
+The rationale for the orthogonal product of prime encoding as the gold standard in the aggregate is the
+test for dominance reduces down to a simple modulo test between the two carefully encoded security
+tokens (User,Object).
+
+For encoding the dominates relation figure 9 above ((Secret, {MI5,MI6}), (Secret, {MI5})) ∈ dominates
+
+Encoding the User Orthogonal token(Secret, {MI5,MI6}) is 5 ∗ 7 ∗ 11 ∗ 17 ∗ 19 = 124355
+
+Encoding of the Object Orthogonal token (Secret, {MI5} is also straight forward 5 ∗ 17 = 85
+
+A test for dominance, (User,Object) ∈ dominate is as simple as testing the modulo of (User,Object) ==
+0: 0 == 124355mod 85
+
+For encoding the not dominates relation figure 10 above, ((Secret, {M15,MI6}), (Secret, {GCHQ,MI6})) /∈
+dominates :
+
+Encoding the User Orthogonal token(Secret, {MI5,MI6}) is again 5 ∗ 7 ∗ 11 ∗ 17 ∗ 19 = 124355
+
+Encoding of the Object Orthogonal token (Secret, {GCHQ,MI6} is also straight forward 5 ∗ 13 = 65
+
+25
+
+
+
+A test for dominance that does not hold for the relation, (User,Object) /∈ dominate is where the
+remainder of the modulo function is greater than zero: 45 == 124355mod 65
+
+8.3 Orthogonal Encoding is an abstraction from actual bits and requires
+more memory
+
+In any new encoding scheme, there are pro’s and con’s; you don’t achieve the advantage of a new system
+that is difficult to hack and is highly maintainable without some disadvantage. One cannot escape the
+digital universe, the binary machine that executes code. The orthogonal multiplication and addition
+’aggregate codes’ reduce down to bit-vectors. The execution is on abstractions of bit vector encoding,
+but storage of abstractions are bit-vectors.
+
+As the example below demonstrates, the abstractions of the multiplication and addition orthogonal
+encoding scheme (addition other than base 2) reduces to a bit-vector size that requires more space than
+encoding in strictly a binary method.
+
+Assuming the three semantics A, B and C and the various encoding from Section 5:
+
+• Using a strictly binary encoding scheme, the three codes: [A = 001, B = 010, C = 100] when
+combined under binary addition will be [111], i.e. a member of the set of bits (1s and 0s) up to
+the Mersenne number 23 − 1
+
+• Using the orthogonal addition encoding scheme of radix 3, three codes: [A = 30, B = 31, C = 32]
+when combined under Orthogonal addition [30 + 31 + 32] will be [1101], i.e. a member of a set of
+bits (1s and 0s) up to the Mersenne number 24 − 1
+
+• Using the orthogonal multiplication scheme of primes, three codes: [A = 3, B = 5, C = 7]
+when combined under Orthogonal multiplication [3 ∗ 5 ∗ 7] will be [1101001], i.e. a member of a
+set of bits (1s and 0s) up to the Mersenne number 27 − 1
+
+The point being made is that the benefits of the multiplication and addition orthogonal encoding are
+offset by the requirements of additional memory that is then required, comparative to a strictly binary
+encoding scheme, to store the orthogonal encoded integers.
+
+Having made the increased storage point, for the sake of completeness, for practical purposes; (1) with
+modern cloud platforms and modern data centres, storage cost keeps reducing, and (2) we are talking
+about the storage of Security Token tags (the meta data) which is minuscule in comparison to the actual
+data storage cost.
+
+9 The application of IBAC for AI and AI Automation
+
+10 Discussion of benefits for Orthogonal Encoding using IBAC
+For both orthogonal encoding methods we have described (1) addition of indexes of some radix
+and (2) products of primes , the utility gained by the dominance relation is related to orthogonality.
+Not so much the Algebraic definition of the dot product but the equal of an aggregated Geometric
+definition based on some aggregated function which deals with both the problems of sparse arrays as
+well as providing superior performance when filtering data.
+
+10.1 Benefits of Orthogonal Security Token encoding
+The practical benefits of both the orthogonal encoding methods is provided by the leverage of the
+aggregate functions and despite a small increase in memory for the orthogonal encoding abstraction,
+the benefits in contrast to bit-vectors include the following:
+
+• Simplicity
+
+• Flexibility
+
+• Highly performant
+
+26
+
+
+
+• Ubiquitous
+
+• Interoperable
+
+10.2 Simplicity
+The algorithms and technology developed are both:
+
+1. Simple to implement and
+
+2. Simple to deploy.
+
+From the governance perspective simplicity means:
+
+• It is straightforward to understand how the security policy has been implemented and
+
+• The assurance of a correctly working policy implemented is also straightforward to verify.
+
+The simplicity of implementation leads to the ease of any business governance process to continually
+audit the verification of a correctly working piece of software and its ongoing integrity and compliance
+over time.
+
+In addition, the simplicity of implementation and the encoding allows ease of communication and
+discourse of the actual policy implemented to the executive branch, who may not be technical.
+
+The “Declarative Nature” of the approach also enhances simplicity. ‘Declarative’ meaning the ability
+to declare what the policy does, without requiring to hard code any security rules and being able to rely
+on a verifiable but abstract simple high-level modulo (in the case of prime number encoding ) function
+to implement the dominance relation. This only adds to the simplicity of audit and compliance of the
+control.
+
+10.3 Flexibility
+The declarative simplicity of the algorithms means the algorithms can be flexibly applied.
+
+For example, if using a rules-based approach implemented directly using bit-vectors, the state of any
+’security rule’ for a given security token would be stored as bits in the vector, where each bit 0 or 1
+holds the meaning of applying or not applying a particular security label.
+
+The bit-vector requires each bit of 0 or 1 of the token to be individually managed, as each bit designates
+if a particular security label (semantic) is applied or is not applied to the token. There is also a limit
+to the bit-vector size itself. All are adding complexity to when the need arises to increase the size and
+maintain the bit-vector.
+
+The abstraction of the bit-vector, using ’prime numbers’ or ’exponents to some base’, requires an integer
+product or integer sum and to remove or add a security label requires only the simple arithmetic operators
+of division in the case of products of primes or subtraction in the case of sums of exponents to some
+base.
+
+To remove 35 from the user label [31 + 32 + 33 + 35 + 36]user = 1011, all that is required is to subtract
+1011 − 35 = 768 = [31 + 32 + 33 + 36]user- . Note that there is no need to manipulate a bit-vector to
+set 1 or 0. To remove 17 from the user label 5 ∗ 7 ∗ 11 ∗ 17 ∗ 19 = 124355user, all that is required is to
+divide 124355
+
+17 = 7315user = 5 ∗ 7 ∗ 11 ∗ 19
+
+There are two crucial implications of this approach that together create great flexibility for managing
+security tokens:
+
+• The Security labels as prime numbers or indexes to some base that are not applied in a token do not
+exist as part of the product or sum for a specific encoded token, and it then follows, components
+of a product or sum that are absent, are not required to be managed.
+
+• There is also no notion of bit-vector size or upper limit of bits, of the number representing security
+labels (semantics). There exists an infinite theoretical capacity in terms of multiplication or
+summation, limited only by the underlying machine technology to process big integers.
+
+27
+
+
+
+The flexibility aspects of the technology go hand in hand with being able to make the technology
+ubiquitous and interoperable.
+
+10.4 Highly performant
+The declarative simplicity of the prime number or exponent algorithms, means the algorithms are fast,
+highly performant. The products of primes algorithm have been implemented on a 400 million row test
+Teradata Databases with negligible performance loss using complex joins between tables.
+
+The alternative rule-based coded approach on Teradata compared at the same time of testing suffered
+an exponential performance loss with joins, whereas the bit vector abstraction, the product of primes
+algorithm, incurred a small linear performance degradation with join complexity.
+
+The reason for the better orthogonal encoding performance on the RDBMS is the performance hit is
+not taken on utilizing, decoded the security policy (i.e., the READ), but on the initial encoding process,
+the INSERT or UPDATE. I.e. the performance benefit gain from utilizing the novel algorithms is by
+moving the computational complexity away from the security policy (READ), which typically is carried
+out many thousands of times once the data is operational, moved to the orthogonal encoding mechanism
+which is done once at set up (INSERT) and on maintenance (UPDATE).
+
+The additional reason for the performance gain for the prime number encoding method is that a simple
+modulo function is used for the implementation of dominance. The benchmark testing on 1000,
+10000, 100000 and 1000000 reads comparing bit-vectors (A ⊈ B) iff (A ∩ B ̸= A) and modulo(A ⊈
+B) iff (AmodB ̸= 0) indicates the bit-vector dominance operation AND comparative to an orthogonal
+prime number algorithm using modulo is typically very close in performance over thousands of reads
+with possibly a more comprehensive performance gain by using modulo when the arrays are sparse.
+
+The User bit-vector Token set as [1011111111] and Object bit-vector Token as [1110111111] The User
+Orthogonal Prime Token set as 2 ∗ 5 ∗ 7 ∗ 11 ∗ 13 ∗ 17 ∗ 19 ∗ 23 ∗ 31 ∗ 61 and Object Orthogonal Prime
+Token as 2*3*5*13*17*19*23*31*37*61 Note that for both the bit-vector and Orthogonal Prime case
+(User,Object) /∈ dominate
+
+Post testing, the bit-vector AND operation, and the product of primes modulo operation were on par.
+At one level it was surprising the modulo operation performed as well as the bit AND operation, but
+at another level, if there is one atomic operation that has been well optimised over the years in both
+hardware and the OS for the express purpose of encryption/decryption, it is the OS modulo operation.
+
+The tables below are a summary of the dominance relation testing. The first two tables are the results of
+testing modulo vs. bit-vector, where the dominance relation does not hold. The executed python code
+for the testing ran on an Intel Core i9, 32 gig of ram, running within the Komodo IDE. The code iterates
+over the one predicate, both bit-vector, and products of primes, timing the corresponding number of
+reads, utilising dominance.
+
+number of reads time Seconds 10 bits AND time Seconds 10 Primes modulo
+
+1,000 0.000158071517944 0.000159978866577
+
+10,000 0.0013210773468 0.00133299827576
+
+100,000 0.0127429962158 0.0128610134125
+
+1,000,000 0.109389066696 0.097678899765
+
+number of reads time Secondsprimes modulo/ time Secondsbit AND
+
+1,000 modulo time, 101.206636501 % of bit-vector AND operation
+
+10,000 modulo time, 100.902364194 % of bit-vector AND operation
+
+100,000 modulo time, 100.926133812 % of bit-vector AND operation
+
+1,000,000 modulo time, 89,2949384387 % of bit-vector AND operation
+
+The second pair of tables is the result of testing of dominance on a sparse array. The Object bit-vector
+token is initialised to [1000000001], with 8 zero bits in the bit-vector. Also the Object orthogonal prime
+number token is initialised to 2 ∗ 61. The tables below are a summary of the dominance relation testing
+for the enoding that is a sparse array of bits; testing, modulo vs. bit-vector, where the dominance
+
+28
+
+
+
+relation does hold. Again, the executed python code was running on an Intel Core i9, 32 gig of ram,
+running within the Komodo IDE. The code iterates over the one predicate, both bit-vector, and products
+of primes, timing the corresponding number of reads, utilising dominance.
+
+number of reads time Seconds 10 bits AND time Seconds10 Primes modulo
+
+1,000 0.000158071517944 0.000164031982422
+
+10,000 0.00168395042419 0.00150394439697
+
+100,000 0.014899969101 0.0139911174774
+
+1,000,000 0.116893053055 0.114114999771
+
+number of reads time Secondsprimes modulo/ time Seconds bits AND
+
+1,000 modulo time, 103.770739065 % of bit-vector AND operation
+
+10,000 modulo time, 89.3104912927 % of bit-vector AND operation
+
+100,000 modulo time, 93,.900312025% of bit-vector AND operation
+
+1,000,000 modulo time, 97.623423111% of bit-vector AND operation
+
+It would seem that when dominance is applied to sparse arrays, there may be a slight improvement when
+using the modulo function rather than the bit AND operation. The results are far from conclusive, and
+it is suggested that full benchmarking is probably a good area of further research.
+
+However, what can be said for certain is the ’modulo’ and bit-vector ’AND’ operations are on par in
+terms of performance.
+
+10.5 Ubiquitous
+The algorithms and technology developed are so flexible and straightforward, it can be ubiquitously
+applied across the entire fabric of an organisation’s technology stack.
+
+Being ubiquitous means the ’one’ organisation’s security policy can be consistently implemented across
+all components of all systems for that organisation and between actual systems of various organisations.
+
+The orthogonal token-based trusted systems implementation of a security policy, either product of ’prime
+numbers’ or sums of ’exponents to some base’, can be ubiquitously applied to the following layers in the
+technology fabric:
+
+1. Application
+
+2. Database
+
+3. File system
+
+4. Operating system
+
+5. Network (messaging)
+
+The research to-date has applied the orthogonal encoded tokens to the RDBMS, an inverted list, noSQL
+DB, and a message broker. I.e. has been applied to enforce the need-to-know security of different stack
+layers, that are all operating and implemented from the one singular security policy.
+
+To help in passing tokens securely in messages and between layers in the stack, a straightforward
+modification to the token orthogonal encoding is a follows. The approach makes interpreting token
+semantics very difficult if a black-hat intercepts a message. The method is to use a new prime number
+as a simple shared ’keys’ between ’sender’ and ’receiver.’ i.e., to obfuscate token information, that then
+makes decoding a token almost impossible.
+
+For example, the user token from section 9 above is as follows, 5 ∗ 7 ∗ 11 ∗ 17 ∗ 19 = 124355. If a prime
+number is selected that would never be part of the security encoding, let’s say 31 is selected, then by
+taking 31 from the encoded token 124355 − 31 = 124324, it becomes challenging if not impossible to
+factor the correct primes {5, 7, 11, 17, 19} from the number 124324 as long as the ’sender’ and ’receiver’
+hold 31 as a key not to be shared.
+
+29
+
+
+
+A similar approach can be used for the other orthogonal encoding approach that is based on summation
+of indexes to some base. Indeed if the base itself is treated as a key between ’sender and ’receiver’, a
+level of obfuscation is provided, as is using integer division of the token by some prime number (prime
+number used as the shared key) that is not associated with the original orthogonal sum encoding.
+
+Note that by using shared keys that remove information, this increases the information uncertainty,
+(higher entropy during transmission) for the orthogonal tokens, it is much more difficult for the black-
+hat to reconstruct information once removed.
+
+These orthogonal token obfuscation techniques do not preclude the use of formal encryption methods.
+However, when orthogonal token obfuscation is used stand-alone, if performance is a significant factor
+that needs resolving in terms of transmission of tokens, the approach is powerful in protecting token
+semantics.
+
+10.6 Interoperable
+There is no one perfect security control for all technology layers in a stack. Security controls are
+orchestrated and can be classified as either ’preventative’ or ’detection’ controls so that when orchestrated,
+they work as a whole. As such, the novel set of algorithms developed and explained in this paper, known
+as orthogonal encoding, can be made to be interoperable with other controls as required. For example,
+orthogonal encoding is interoperable and can take advantage of encryption, two-factor authentication,
+x500 directory services, and other known cybersecurity controls.
+
+11 A complete policy implementation example
+Lets practically look at a complete policy example that has been implemented in the RDBMS.
+
+This trusted system policy implementation has been included to enable the reader an understanding of
+the discussion above. It should be noted the implementation described is for the RDBMS; however the
+security policy outlined would be as easily implemented in the messaging layer.
+
+For this example, the product of the primes encoding method has been used as the orthogonal encoding
+mechanism.
+
+diagram-1 - The security universe of discourse
+
+The second diagram indicates the user (subject) policy and the subsequent encoding.
+
+The third diagram indicates Security Levels and their set inclusion. For example, if the user has access
+to ’Secret’, they also have access to ’Protected’. Note that set inclusion only applies to the user (Subject)
+encoding
+
+30
+
+
+
+diagram-2 - user (Subject) encoding of products of primes
+
+diagram-3 - user encoding of levels is an inclusion
+
+The fourth diagram indicates the various compartments that can be combined. There is no concept of
+hierarchy in terms of the compartments. The data is just categorical.
+
+diagram-4 - combinations of categories in this case organisational units
+
+The fifth diagram indicates that projects are both hierarchal and categorial. Like Security Levels, set
+inclusion only applies to the user (Subject)
+
+The sixth diagram indicates how data (Object) is encoded. Note that Karen (the 1st row), ’borders’,
+’MI6’ and ’Protected’ are combined as 3 × 13 × 17 = 663 and is recorded in the ’Sec_Tag’ column.
+Also note that for the data (Object) encoding, there is no concept of set inclusion. It is not to say for
+projects; the argument could not be made for set inclusion on the object. The policy, however, treats
+set inclusion for projects only on the user (Subject) side.
+
+31
+
+
+
+diagram-5 user encoding of possible projects visible and their interrelationships
+
+diagram-6 - The encoding of the data (Objects) occurs at a row level for the RDBMS example
+
+The seventh diagram indicates the mechanics of the dominance relation at a row-level in the database.
+The technical implementations use a SQL view such that the modulo function works as an abstract
+function over the view based on the orthogonal encoding choices made at both insert and update of
+the data. Because the modulo method is so simple to implement, the single policy, as outlined in
+this example, is then straightforward to implement in the other layers of the technology stack, such as
+messaging and even ’directory services’. In this way, the need-to-know can be defined as a single security
+policy, then implemented in many technical stack layers.
+
+diagram-7 - technical implementation of the dominance relation as a SQL view
+
+Lastly, the eighth diagram indicates the rows that would be returned (stared rows) for the MI6 Secretary.
+
+32
+
+
+
+diagram-8 - The MI6 Secretary separation of duty, their need-to-know on a full table scan
+
+References
+[1] Google Patents, Security token and system and method for generating and
+
+decoding the security token D Finlayson and M Stocks, 2014, US8752207B2,
+https://patents.google.com/patent/US8752207/no
+
+[2] Bell D.E. and Lapadua. L. 1973, Secure Computer Systems: Mathematical Foundations, MITRE
+Technical Report 2547, Volume I.
+
+[3] Lapadua L. 1996, Secure Computer Systems: Mathematical Foundations (reconstruction), MITRE.
+
+[4] Amoroso E. 1994, Fundamentals of computer security technology, Prentice Hall, NJ, USA
+
+[5] Montana State University, Lukas Geyer, 2008, proof, http://www.math.montana.edu/geyer/2008-
+fall/documents/key1.pdf
+
+[6] John D Cook, blog, 2010, Perpendicular and relatively prime,
+https://www.johndcook.com/blog/2010/11/16/perpendicular-and-relatively-prime/
+
+[7] Lawvere, F. William, and Stephen H. Schanuel. Conceptual Mathematics: A First Introduction to
+Categories. 2nd ed., Cambridge University Press, 2009.
+
+[8] Hu, V. (2014). "Attribute-Based Access Control (ABAC) Definition and Considerations." National
+Institute of Standards and Technology (NIST).
+
+[9] Fischer, J., Marino, D., Majumdar, R., Millstein, T. (2009). "Fine-Grained Access Control with
+Object-Sensitive Roles." ECOOP 2009, Springer.
+
+[10] Levy, H. M. (1984). "Capability-Based Computer Systems." Digital Press.
+
+[11] Ukil, A., Jana, D. (2016). "Capability-Based Access Control for IoT Devices Using OAuth." IEEE
+7th Annual Information Technology, Electronics and Mobile Communication Conference (IEMCON).
+
+[12] Hargraves, Gordon., 1993, Object-oriented Model for Information Confidentiality and Integrity.
+University of Technology, Sydney, School of Computing Sciences.
+
+33
+
+http://www.math.montana.edu/geyer/2008-fall/documents/key1.pdf
+http://www.math.montana.edu/geyer/2008-fall/documents/key1.pdf
+
+	Background
+	Role-Based Access Control (RBAC) limitations
+	Active Directory (AD) limitations
+	Attribute-Based Access Control (ABAC) limitations
+	Capability-Based Access Control (CapBAC) limitations
+	Integer Based Access Control (IBAC) and it's Trusted-System linage
+	IBAC principles
+
+	Classical Implementation of the Trusted System
+	Security Dominance Relation definition
+	Flattening the dominance structure - Proof of Equivalence Between Graph Dominance and Set Inclusion using a set encoding method 
+	Directed Graph Dominance
+	Set Encoding
+	Proof of Equivalence
+	1. Graph Dominance Implies Subset Relationship
+	2. Subset Relationship Implies Graph Dominance
+	Application to Given Hierarchical Labels
+	Conclusion
+
+	Trusted System Security Policy - Mathematical Schema label definition 
+	Simplification of the Trusted System security policy by set Inclusion and a simple test for subset between  user  and  object 
+
+	IBAC Process Dominance - Extending the trusted system's model
+	One-to-One "Subject" and a "Process" (Bijective) Relationship 
+	Formal definition Bell-LaPadula Extension with example problem-1 of a secret printer printing lower classification documents 
+	Problem Statement
+	Solution
+	Formalization in Category Theory
+
+	Formal Definition Bell-LaPadula Extension with Example Problem-2 of a Briefing Room
+	Problem Statement
+	Solution
+	Formalization in Category Theory
+	Commutative Diagram
+
+
+	Implementation of dominance
+	The problem of bit-vector implementation
+	Dominance binary relation implementation as bit-vector boolean operations
+	bit-vectors are easy to hack
+	bit-vectors are difficult to manage and maintain and there is a sparse array problem to overcome 
+	What happens when you want to exceed the size of the bit-vector
+
+
+	Bit-vector Orthogonal Subspaces of security vectors - the first step in fast implementation methods 
+	bits as unit vectors
+	Dot Product as a test of Dominance
+	proof: Dot Product as a Dominance Test - Equivalence between Logical Expressions for  user object1 = object1  and  userC object1 = 0 , Plus  user object2 =object2  and  userC object2 = 1  
+	Definitions and Initial Setup for  userC object1 = 0 
+	Proof Steps for -  userC object1 = 0 
+	Proof
+	Definitions and Initial Setup for  userC object2 = 1 
+	Proof Steps for -  userC object2 = 1 
+	Proof
+	Conclusion
+
+
+	IBAC Security Label Encoding for Orthogonality and Dominance implemented as Aggregate functions for massive performance enhancement
+	IBAC Orthogonal Addition encoding dealing with the problem of sparse arrays
+	The mechanics of addition encoding
+	Aggregate Value of sum of exponents - the right hand side
+	Dealing with sparse arrays of bit-vectors 
+	Aggregate dominance 
+
+	IBAC Orthogonal Prime Number encoding
+	The mechanics of Products of primes encoding
+	Aggregate Value of product of primes - the right hand side
+	Orthogonal Encoding is an abstraction from actual bits and requires more memory
+
+	The application of IBAC for AI and AI Automation 
+	Discussion of benefits for Orthogonal Encoding using IBAC
+	Benefits of Orthogonal Security Token encoding
+	Simplicity
+	Flexibility
+	Highly performant
+	Ubiquitous
+	Interoperable
+
+	A complete policy implementation example
+

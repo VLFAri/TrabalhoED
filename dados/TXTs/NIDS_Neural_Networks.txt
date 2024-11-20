@@ -1,0 +1,920 @@
+
+NIDS Neural Networks Using Sliding Time Window Data
+Processing with Trainable Activations and its Generalization
+
+Capability
+
+Anton Raskovalov1,*, Nikita Gabdullin1, and Ilya Androsov1
+
+1Joint Stock “Research and production company “Kryptonite”
+E-mail: a.raskovalov@kryptonite.ru, n.gabdullin@kryptonite.ru, i.androsov@kryptonite.ru
+
+*corresponding author
+
+Abstract
+
+This paper presents neural networks for network intrusion detection systems (NIDS),
+that operate on flow data preprocessed with a time window. It requires only eleven features
+which do not rely on deep packet inspection and can be found in most NIDS datasets and
+easily obtained from conventional flow collectors. The time window aggregates information
+with respect to hosts facilitating the identification of flow signatures that are missed by
+other aggregation methods. Several network architectures are studied and the use of
+Kolmogorov-Arnold Network (KAN)-inspired trainable activation functions that help to
+achieve higher accuracy with simpler network structure is proposed. The reported training
+accuracy exceeds 99% for the proposed method with as little as twenty neural network
+input features. This work also studies the generalization capability of NIDS, a crucial
+aspect that has not been adequately addressed in the previous studies. The generalization
+experiments are conducted using CICIDS2017 dataset and a custom dataset collected as
+part of this study. It is shown that the performance metrics decline significantly when
+changing datasets, and the reduction in performance metrics can be attributed to the
+difference in signatures of the same type flows in different datasets, which in turn can
+be attributed to the differences between the underlying networks. It is shown that the
+generalization accuracy of some neural networks can be very unstable and sensitive to
+random initialization parameters, and neural networks with fewer parameters and well-
+tuned activations are more stable and achieve higher accuracy.
+
+Keywords: cybersecurity, network intrusion detection, NetFlow, NIDS datasets, trainable
+activations.
+
+1 Introduction
+In today’s digital landscape, where cyberattacks are increasingly sophisticated and frequent,
+the need for robust security measures is greater than ever. Network Intrusion Detection Sys-
+tems (NIDS) have emerged as a critical component in safeguarding networks from potential
+threats. NIDS are designed to monitor network traffic for signs of malicious activity, provid-
+ing a crucial layer of defense against unauthorized access and attacks. By analyzing network
+
+1
+
+
+packets in real-time and using advanced algorithms to detect anomalies and suspicious be-
+havior, NIDS help organizations to quickly identify and respond to threats before they can
+cause significant damage. As cyber threats continue to evolve NIDS become increasingly
+indispensable.
+
+Advancements in computer science have led to the integration of machine learning into
+Network Intrusion Detection Systems, significantly enhancing their effectiveness. Traditional
+NIDS rely on predefined signatures and heuristic rules to identify threats, which can limit
+their ability to detect new or evolving attacks. However, Machine Learning (ML) can help
+NIDS to analyze vast amounts of network traffic and identify patterns that might be indicative
+of previously unknown threats. In addition, ML algorithms can learn and adapt over time.
+To date there are many papers where ML is used for the purposes of NIDS: Extra Trees [1],
+fully-connected neural networks [2], convolution and recurrent neural networks [3, 4], graph
+neural networks (GNN) [5–8]. The popularity of graph-based networks for NIDS can be
+explained by the fact that numerous network hosts and the flows between them can naturally
+be represented as nodes and edges of a graph, respectively.
+
+Whereas in our previous work promising results with GNN-based NIDS were achieved [8],
+GNNs were found to be very unstable in generalization scenarios discussed in Section 4.1.
+Graphs can also add unnecessary complexity to the traffic data collection and storage problem.
+That happens because for datasets collected over prolonged periods of time we receive a large
+number of edges for each node, many of which are temporally distant and should not be
+considered for decision-making. This also creates a problem of selecting the appropriate time
+frame for dataset collection and the adequacy of transferring learning from one graph to
+another collected over a different time period. Furthermore, the graph topology for NIDS
+is not very relevant: in real scenarios we know nothing about external hosts except that
+they exchange information with our hosts. We have no information about the data exchange
+between external hosts, so we can only know the edges involving “our” nodes. Thus, the
+graph degenerates into a “bristle” pointing towards external hosts. Message passing along
+such graphs is not interesting.
+
+For these reasons we have moved away from graph neural networks and adopted a time
+window-based approach as a faster and more transferable solution that accounts for the tem-
+poral characteristics of network traffic. To make decisions about flows we collect data from
+the hosts over a specified time interval. It is worth noting that attacks such as DoS, DDoS,
+and PortScan have very distinct temporal signatures — these always involve a large number
+flows per unit of time, which is not considered in graph-based solutions. From a computa-
+tional perspective, efficiency improves for a time window-based approach because there is no
+need to build and maintain a graph in memory. We do not need to wait for another flow on
+the same host; we can proceed with the results immediately.
+
+Another issue addressed in this paper is the transfer ability of learning across differ-
+ent datasets, or neural network generalization capability. Good generalization is desirable
+meaning that the method should perform well on different datasets without neural network
+retraining. Prior research addressing issues of working with different datasets does not present
+generalization experiments since all test results were demonstrated on the same dataset the
+networks were trained on [1,4–7]. Moreover, some studies have used different feature sets for
+different datasets [5,6]. In this study we propose a generalized feature set that we use to access
+the generalization across datasets. The results are somewhat underwhelming; in some cases
+it is challenging to achieve not only good transfer accuracy but even transfer stability. This
+
+2
+
+
+
+Table 1. Differences between NIDS datasets.
+
+parameter / dataset ToN-IoT [13] CICIDS2017 [14] own (see Section 2.2)
+units of duration ms µs s
+
+transferred bytes do / both with headers without headers
+do not include headers available
+
+collector timeout unspecified 2 min 5 min
+TCP flows are merged yes no yes
+
+issue is discussed in detail in the corresponding section with an explanation of the underlying
+reasons.
+
+The rest of the paper is organized as follows: datasets and their preprocessing is described
+in Section 2, our method is proposed in Section 3, the obtained results are discussed in
+Section 4, and Section 5 concludes the paper.
+
+2 NIDS datasets
+Whereas various open-access NIDS datasets are available for neural network training [9–16],
+there is no consistency between data fields is these datasets. Moreover, same fields in different
+datasets might have different formats or be collected under different conditions complicating
+the use of the datasets. Table 1 illustrates this problem.
+
+2.1 CICIDS2017 dataset
+
+In this study we mainly use CICIDS2017 (CDS) [14] dataset for neural network training,
+which is collected by Canadian Institute for Cybersecurity. It consists of raw data pcap files
+and csv files with aggregated flow data. Unfortunately, we were unable to use CICIDS2017
+“as is” due to several issues. First, units of some fields in CICIDS2017 were different from
+those obtained from a collector used to produce our dataset (described in the next section),
+and headers were not considered when calculating transferred bytes. Second, the collector
+timeout was very short making some flows appear deceptively short. Most importantly, flows
+longer than the collector timeout were not merged after the dump in CICIDS2017, which
+produced significant aggregation artifacts.
+
+To avoid these issues, we used the original pcap files to generate flow data compatible with
+other datasets using Tranalayzer2 [17] with settings PACKETLENGTH=2 (with headers),
+FLOW_TIMEOUT=300 (5 min collector timeout), IPV6_ACTIVATE=0 (ipv4 only).
+
+We used timestamp and src/dst ip addresses to correlate the original CICIDS2017 labels
+with the new flows. The correctness of such labeling was verified by randomly choosing data
+in pcaps using tshark [18], checking time and ip addresses and comparing the labels. We
+have also merged similar CDS classes, such as different DoS or PortScan types, and removed
+classes with few samples resulting in a dataset we labeled as CDSR with six classes: 1475310
+benign, 167015 DoS, 94614 DDoS, 7750 Password, 216866 PortScan, and 661 XSS.
+
+3
+
+
+
+2.2 Own Dataset
+
+To test generalization capabilities of neural networks trained on CDSR a small dataset con-
+sisting of NetFlowv5 data was collected on our corporate network. Benign flows were collected
+over the duration of two hours during normal weekday working hours to correctly represent
+realistic diverse normal traffic. The network primarily consisted of Windows and Linux ma-
+chines. During the same time frame PortScan and DoS attacks were conducted in an isolated
+laboratory network inside the main corporate network.
+
+A laptop with Ubuntu 22.04 was used as attack station to scan ports of other Ubuntu
+20.04 Laptops and Ubuntu 20.04 servers. For DoS attack a web server launched on one
+of the servers was used as the target. No Windows machines were used during the attack
+experiments. Nmap was used for PortScan attacks with and without sudo, and flags -sS, -sP,
+-PA, -PU. Total PortScan duration was one hour. For DoS 20 min of slowhttptest [19] and
+40 min of GoldenEye [20] attacks were conducted.
+
+In total three datasets were collected: 945933 benign + 28244 DoS (referred to as OD);
+590238 benign + 18332 PortScan (referred to as OS); and their combination resulting in
+1536171 benign + 28244 DoS + 18332 PortScan (referred to as ODS).
+
+3 Methodology
+
+3.1 Time-Window Processing of Datasets
+
+NIDS datasets are commonly distributed as *.csv files of tables with rows representing flows
+and columns with fields containing flow attributes. Assuming that these data are sorted
+by timestamp, the following algorithm can be used to process datasets using a sliding time
+window.
+
+We propose to use the following data structures to aggregate and store flow data. They
+include three lists for each host that will include flows categorized by protocol: TCP, UDP,
+and Other. For each flow we first check its source and destination IP addresses. When those
+are encountered for the first time, new data structures for source and destination hosts are
+created. When the data structure for encountered hosts already exists, a time window of set
+length that uses current flow’s timestamp as an anchor is used to check which flows from the
+host’s lists are in the time window. All flows that are not in the window are discarded. Next, it
+is checked whether the source and destination ports of the current flow have been used before
+for the respective hosts to set corresponding flags, and the aggregation information for the
+existing host records is updated. The current flow is added to the appropriate host list (TCP,
+UDP, or Other) based on its protocol. All received information is saved: the flow data, the
+aggregation information about hosts, and the quantitative information about hosts (number
+of flows and ports of each type), see Algorithm 1. After this conversion, the flow and host
+information for the given timestamp is “frozen”. All necessary data are saved, eliminating the
+need for further computations or specific processing order. It is possible to train on batches
+of such data randomly sampled from the converted dataset.
+
+It should be noted that when network activity on a host is high (many flows fall within
+the time window), calculating aggregation information can be time-consuming as it requires
+recalculating the average over a large number of flows. This problem is often solved by
+choosing a fixed number of random flows for aggregation which adds uncertainty into the
+
+4
+
+
+
+analysis. However, in our latest models we decided not to use the information about average
+values of parameters for decision-making and only considered the number of flows and the
+number of used ports within the time window. These quantities can be calculated sufficiently
+fast even for real-time scenarios. The proposed method is also convenient if there is a need
+to add additional host metrics such as CPU load, disk access, etc. However, studying such
+metric was outside of the scope of this study.
+
+Algorithm 1 Flow data processing with a time window
+1: initialize hosts ← {}, index ← 0
+2: allocate FLOW, AGGR1, AGGR2, CNT1, CNT2
+3: for rows in dataset do
+4: data1 ← duration, src packets, dst packets, src bytes, dst bytes
+5: data2 ← duration, dst packets, src packets, dst bytes, src bytes
+6: if src_ip not in hosts then
+7: hosts[src_ip] ← new host
+8: else
+9: remove flows that are outside the time window from hosts[src_ip]
+
+10: end if
+11: if dst_ip not in hosts then
+12: hosts[dst_ip] ← new host
+13: else
+14: remove flows that are outside the time window from hosts[dst_ip]
+15: end if
+16: Aggregate data and make counts for hosts[scr_ip]
+17: Aggregate data and make counts for hosts[dst_ip]
+18: new_port1 ← src_port not in hosts[src_ip]
+19: new_port2 ← dst_port not in hosts[dst_ip]
+20: FLOW[index] ← flow data, new_port1, new_port2
+21: AGGR1[index] ← hosts[src_ip] aggregated data
+22: AGGR2[index] ← hosts[dst_ip] aggregated data
+23: CNT1[index] ← counts for each protocol for hosts[src_ip]
+24: CNT2[index] ← counts for each protocol for hosts[dst_ip]
+25: add data1 to hosts[src_ip]
+26: add data2 to hosts[dst_ip]
+27: index ← index + 1
+28: end for
+
+3.2 Feature Engineering
+
+There are two types of dataset features: the raw dataset parameter values obtained from
+the collector and the derived features added before feeding data into the neural network.
+Typically, host IP addresses are not used directly, but they may be utilized for constructing
+a graph [5–8]; some parameters like protocol are converted into one-hot feature vectors. So,
+there is no one-to-one relation between these types of features. We will refer to the first type of
+features as “fields” and the second one as “features”. Our core principle is to avoid using fields
+
+5
+
+
+
+Table 2. Necessary dataset fields and their use in time window calculations
+
+timestamp Merging flows for hosts
+src ip Merging flows for hosts
+
+src port Counting unique «in use» ports for hosts, evaluating
+if current flow’s port have already been in used for the host
+
+dst ip Merging flows for hosts
+dst port Counting unique «in use» ports for hosts, evaluating
+
+if current flow’s port have already been in used for the host
+protocol Categorizing flows and choosing neural network
+duration Feature calculation (3 features)
+
+src packets Feature calculation (6 features)
+dst packets Feature calculation (6 features)
+
+src bytes (with headers) Feature calculation (6 features)
+dst bytes (with headers) Feature calculation (6 features)
+
+that are difficult to obtain or for which data are missing in well-known datasets. Therefore, all
+our features are based on universal fields that are available in almost all datasets: duration,
+packet count, byte count, protocol and port numbers, without requiring information obtained
+by deep packet inspection. This approach also allows us to use the same model with the
+same input dimensions across different datasets, unlike [3], where a unique set of features was
+defined for each dataset. Also, note that using a large number of fields may lead to overfitting.
+The set of fields required for our method and their purposes are summarized in Table 2.
+
+In most cases, the src and dst prefixes do not truly identify which host initiates the
+exchange since such marking is determined by the first packet that arrives within the flow
+collector’s time window. Therefore, field pairs such as (src bytes, dst bytes) are instead
+ordered by magnitude
+
+feature1, feature2 = max(src_bytes, dst_bytes), min(src_bytes, dst_bytes), (1)
+
+which makes our neural network invariant to the identification of src and dst hosts. Fea-
+tures used here are listen in Table 3.
+
+As noted earlier, the data for the time window separately tracks the number of TCP, UDP,
+and other types of flows as well as the number of ports (with TCP and UDP ports counted,
+and zero for other protocols). All counts (ports and flows) are computed for the protocol to
+which the flow belongs, as illustrated in Figure 1.
+
+3.3 Feature normalization with trainable activation functions
+
+The values of obtained features are generally not bound to a specific range, but for stable
+neural network performance it is preferable to use ranges of -1 to 1 or 0 to 1. The standard
+practice is to perform feature normalization using the mean and variance of the data [2,3,5,7]
+or feature scaling based on the range of values [1]. Note that normalizing using standard
+deviation is unfeasible for non-normal distributions and can make the model overly dependent
+on the data distribution in the training dataset. Additionally, these types of normalization
+still do not strictly limit the resulting values that may still fall outside the -1 to 1 interval when
+
+6
+
+
+
+Table 3. NIDS Features constructed in this paper.
+
+Features obtained directly from flow fields:
+1 duration
+2 abs(src packets – dst packets)a
+
+3 abs(src bytes – dst bytes)b
+
+4 duration / (src bytes + dst bytes)
+5 duration / (src packets + dst packets)
+6 max(src packets, dst packets)
+7 min(src packets, dst packets)
+8 max(src bytes, dst bytes)
+9 min(src bytes, dst bytes)
+10 max(src bytes / (src packets + 10-4), dst bytes / (dst packets + 10-4))c
+
+11 min(src bytes / (src packets + 10-4), dst bytes / (dst packets + 10-4))
+Features obtained with aggregation information inside current time window:
+
+12 0.5 (new port 1 + new port 2)d
+
+13 max(src flow count, dst flow count)
+14 min(src flow count, dst flow count)
+15 max(src port count, dst port count)
+16 min(src port count, dst port count)
+17 abs(src flow count – dst flow count)
+18 abs(src port count – dst port count)
+19 max(src port count / (src flow count + 10-4), dst port count / (dst flow count + 10-4))
+20 min(src port count / (src flow count + 10-4), dst port count / (dst flow count + 10-4))
+
+a packets refers to the number of packets,
+b bytes refers to the number of transferred bytes (with headers),
+c adding 10-4 to the denominators is done for numerical stability to avoid division by zero,
+d new port shows that port of this flow has not been used on the host before in this time
+window.
+
+7
+
+
+
+Figure 1: Choosing quantitative host data depending the flow protocol.
+
+transitioning between different datasets. Therefore, instead of normalization, we employed
+learnable activation functions inspired by Kolmogorov-Arnold Networks (KANs) [21].
+
+One of such functions is a step function, or a “ladder” of step functions, which is guaranteed
+to return a value between zero and one:
+
+y = 1
+n
+
+n∑
+i=1
+
+erf(ki(x − xi)), (2)
+
+where n is a number of steps which is a fixed parameter; ki, xi are trainable parameters
+for slopes and positions of ith step, respectively. Another one is a function containing multiple
+peaks similar to spline activations in KAN [21]:
+
+y =
+n∑
+
+i=1
+exp
+
+(
+−(x − xi)2
+
+wi
+
+)
+, (3)
+
+where n is a number of peaks, fixed parameter; wi, xi are trainable parameters for widths
+and positions of peaks, respectively. This function can return a value greater than 1 when
+peaks are close together. In order to avoid steps and peaks getting too close to one another
+during training, we allow only the ones with the least absolute value of their gradient to be
+modified by setting gradients of the other ones to zero, thus localizing learning, similar to
+KAN splines [21]. The initial parameters of trainable activation functions are not initialized
+randomly but are chosen considering feature trends in specific datasets for faster training.
+
+8
+
+
+
+Table 4. Studied neural network architectures.
+
+model number of features’ activation layers
+features numbers (see 3.2) functions
+
+TWNet1 7 1,3,5,13,15, erf (k * x) FF{16,32} +
+2, zero-leng flag none classifier *
+
+TWNet2 15 (features 6–9 1,3,5,13,15 erf (k * x) FF{16,32} +
+used twice with 6–9 (twice) erf (x – x0) classifier
+different x0 in 12 none
+activation) 1
+
+TWNet3 18 1 (2), n=3 classifier /
+3,5,13–20 (2), n=1 FF{32,32} +
+6–11 (2), n=2 classifier
+12 none
+
+TWNet4 18 1 (2), n=3 classifier /
+3,5,13–20 (2), n=1 FF{32,16} +
+6–11 (3), n=2 classifier
+12 none
+
+TWNet5 20 1 (2), n=3 FF{32,16} +
+2–5,13–20 (2), n=1 classifier
+6–11 (3), n=3
+12 none
+
+3.4 Neural Network Architectures
+
+After computing all the features and applying activation functions to them, the results are fed
+into a neural network with a very simple architecture (referred as TWNet). We tested fully
+connected neural networks with two hidden layers and ReLU activations referred to as “FF”
+in Table 4. Values of x and y in FF{x,y} show the number of neurons in the first and the
+second layer, respectively. We also tested neural networks with no hidden layers with features
+passed directly to classifier.
+
+The fully connected neural networks were designed so that their parameters depended on
+the flow’s protocol (TCP, UDP, or other). This was achieved by creating three separate sub
+networks, one for each protocol, and applying appropriate masks, as shown in Figure 2.
+
+3.5 Training and verification details
+
+Training and validation experiments were conducted using two distinct datasets. One dataset
+(referred to as training dataset) was split to 80/20 subsets with the model trained on the 80%
+subset. After each epoch performance metrics were calculated using the entire second dataset
+(referred to as testing dataset) with the accuracy value on the second dataset referred to as
+generalization (or testing) accuracy. At the end of training, metrics were also calculated using
+the entire training dataset. We used the AdamW optimizer with weight decay set to 10-5 and
+learning rate of 5×10-4, and cross-entropy as our loss function. The neural network trained
+efficiently, achieving high accuracy (up to 99%) on the training dataset. Only the multiclass
+classification task was studied.
+
+9
+
+
+
+Figure 2: Applying different neural networks depending on flow’s protocol. Since for every
+flow only one protocol flag is non-zero, only corresponding protocol’s neural network output
+is non-zero, too.
+
+4 Results and Discussion
+
+4.1 Neural network generalization
+
+The generalization capabilities were studied for neural networks with architectures summa-
+rized in Table 4. FF GNN in Table 5 refers to GNN used in our previous work [8]. The effects
+of random initialization of weights and other parameters were studied by conducting several
+identical runs with different random seeds for both training and testing datasets. It should
+be stressed again that testing was performed on our dataset, which was different from the
+training dataset, and not on its validation subset. The results are shown in Table 5 where
+training accuracy refers to the accuracy calculated for full training dataset (CDSR, train and
+validation subsets) after several epochs (see column 3). Testing dataset metrics were calcu-
+lated on one of subsets of our dataset (OD, OS or ODS) without any fine-tuning or retraining
+of the model. Testing dataset metrics in columns 4–7 include recall (ratio of true positive
+(TP) for attack type to the number of all attacks of that type) for DoS and PortScan (if
+applicable), correct attack detections rate, and accuracy.
+
+The correct attack detections rate (CAD) is determined as follows:
+
+CAD =
+∑
+
+TP∑
+(TP + FP ) , (4)
+
+for all attacks in dataset.
+These metrics for training dataset are shown in later sections. Typically, these metrics
+
+were high for well-represented classes (Benign, DoS, DdoS, PortScan) and low for classes with
+fewer samples (Password, XSS).
+
+Table 5 shows that training dataset accuracy increases and its variation decreases with
+additional features. It should be stressed that adding features does not require additional
+dataset fields. However, testing dataset metrics were varying drastically between runs even
+
+10
+
+
+
+Figure 3: Visualization of value distribution for some data fields in datasets (CDSR and
+ODS): min vs max numbers of transferred bytes (upper row), and min vs max count of ports
+per counts of flows between hosts (bottom row).
+
+when training accuracy remains the same, with the variations sometimes reaching several
+orders of magnitude. This effect was first observed for the GNN model studied in [8]. These
+variations become less prominent for architectures with fewer parameters (without hidden
+layers), e.g. TWNet4{0}. For such models training with different random seeds yields al-
+most the same weights with very low cross-run variance and shows almost the same testing
+accuracy. On the other hand, such architectures are harder to train and they show almost no
+improvements for longer training (higher number of epochs).
+
+Generalization (testing) accuracy was calculated only for attacks present in both training
+and testing datasets, i.e. DoS and PortScan. Table 5 shows that PortScan generalize much
+better than DoS. Moreover, in some cases PortScan training and generalization accuracies
+are almost the same when switching from CDSR dataset to ours, with recall above 99%.
+Unfortunately, this also results in high false positive (FP) rate illustrated by low values in
+correct attack detections rate (column 6).
+
+These effects can be explained if feature value distributions for training and testing
+datasets are compared side-by-side. Figure 3 shows that both attack and benign traffic fea-
+tures are very different.
+
+4.2 Test of catastrophic forgetfulness and the ability to retrain
+
+One of the reasons that the features in Figure 3 are very different are the specifics of particular
+networks, such as network type, collector timeout, server types, etc. In this Section we study
+the possibility to retrain a neural network model trained on one dataset using another one.
+
+11
+
+
+
+Table 5. Generalization experiment results for CDSR as training and ours are testing datasets.
+
+model run accuracy DoS recall SCAN recall CAD accuracy
+on entire on testing on testing on testing on testing
+training dataset, % dataset, % dataset, % dataset, %
+
+dataset, %
+FF GNN [8] 1 97.0 - 33.6 66.6 96.5
+
+2 98.0 - 8.3 79.0 96.5
+3 97.4 - 16.6 30.0 95.8
+4 98.7 - 0.0 0.0 73.2
+
+TWNet1{16,32} 1 93.3 - 89.5 11.5 79.0
+2 96.6 - 93.9 5.7 53.3
+3 94.0 - 54.1 7.3 78.1
+4 96.5 - 90.0 6.1 58.3
+
+TWNet2{16,32} 1 98.1 - 93.3 15.1 83.9
+2 95.8 - 99.9 17.0 85.3
+3 95.7 - 94.7 26.2 91.8
+4 95.8 - 9.0 2.9 88.3
+
+TWNet2{16,32} 1 95.7 0.8 - 0.2 87.5
+2 98.0 20.0 - 3.0 79.1
+3 95.8 0.4 - 0.1 87.0
+4 95.8 0.9 - 0.3 87.7
+
+TWNet3{0} 1 98.6 69.9 99.1 13.6 84.2
+2 98.6 20.4 98.1 11.9 87.4
+3 98.5 9.5 95.1 10.9 88.0
+4 98.7 32.2 98.1 12.4 86.7
+
+TWNet3{32,32} 1 98.9 4.6 99.7 9.9 87.1
+2 98.9 32.8 99.7 26.5 93.9
+3 99.0 15.7 99.7 25.8 94.3
+4 98.8 0.0 40.1 3.1 62.5
+
+TWNet4{0} 1 98.7 3.0 99.4 7.0 82.3
+2 98.6 2.8 98.9 9.3 86.6
+3 98.6 2.9 99.1 9.7 87.1
+4 98.6 2.9 99.4 6.2 79.9
+
+TWNet4{32,16} 1 98.9 3.8 99.7 7.9 84.0
+2 98.9 9.8 99.7 9.1 85.1
+3 98.9 12.3 99.7 4.0 65.5
+4 99.0 2.8 99.7 5.6 78.0
+
+TWNet5{32,16} 1 99.0 3.1 99.6 7.3 83.0
+2 99.0 2.8 99.6 4.0 69.4
+3 98.9 15.1 99.8 5.1 72.0
+4 99.0 43.0 99.6 6.5 71.5
+
+12
+
+
+
+Table 6. Results of retraining from CDSR to ODS datasets for TWNet5{32,16}.
+
+train CDSR (8 epochs), train ODS (4 epochs), verify CDSR
+verify ODS
+
+run accuracy accuracy accuracy accuracy DoS, % SCAN,% CAD, %
+CDSR, % ODS, % ODS, % CDSR, % recall,% recall,%
+
+1 99.0 83.0 99.5 81.3 0.0 58.4 94.7
+2 99.0 77.2 99.5 80.7 0.0 52.8 94.5
+3 99.0 69.4 99.5 81.4 0.2 59.0 94.9
+4 98.9 72.0 99.5 81.3 0.0 58.2 94.9
+5 99.0 81.7 99.5 81.2 0.2 57.8 94.5
+6 99.0 71.5 99.5 81.5 0.0 60.1 94.9
+7 98.9 82.3 99.5 81.5 0.0 59.9 95.1
+8 99.0 73.2 99.5 81.2 0.0 58.0 94.9
+
+Table 7. Results of retraining from ODS dataset to CDSR datasets for TWNet5{32,16}
+
+train ODS (8 epochs), train CDSR (4 epochs), verify ODS
+verify CDSR
+
+run accuracy accuracy accuracy accuracy DoS, % SCAN,% CAD, %
+ODS, % CDSR, % CDSR, % ODS, % recall,% recall,%
+
+1 99.5 80.8 98.9 93.4 80.1 99.6 29.2
+2 99.5 80.7 98.8 83.5 88.7 99.8 14.3
+3 99.5 80.7 98.9 88.7 7.0 99.8 11.7
+4 99.5 80.6 98.8 90.5 92.3 99.6 22.9
+5 99.5 80.7 98.9 92.3 76.0 99.7 25.8
+6 99.5 81.2 98.8 92.9 57.8 99.7 25.7
+7 99.5 81.2 98.9 91.1 79.5 99.8 23.1
+8 99.5 81.2 98.9 91.2 84.0 99.7 23.7
+
+We also study the effects of «catastrophic forgetfulness», or how the initial training dataset‘s
+accuracy decreases during retraining. It is expected that the use of local learning [21] in our
+model should reduce such effects. The experiments were organized as follows: TWNet5{32,16}
+was randomly initialized and trained for 8 epochs on the first dataset, with both training and
+generalization accuracies recorded after training is complete. Then the model was trained
+for 4 epochs on the second dataset witch accuracy recorded for both datasets along with
+additional metrics for the first dataset. Table 6 summarizes the results for experiments, with
+first dataset being CDSR and the second one being our dataset. Datasets are switched for
+the experiments summarized in Table 7.
+
+As it can be expected, the first training dataset accuracy was high in all experiments.
+However, the model was easily retrained with new data, “forgetting” the initial training,
+as illustrated by the reduced accuracy on first dataset with retraining epochs. For instance,
+CDSR accuracy has reduced from 99% to 81% with only 50–60% PortScans correctly detected
+with low attack FP rate. On the contrary, PortScan detection accuracy is high when datasets
+are switched, but FP rate is high, too. It can be observed that DoS accuracy varies significantly
+among runs. The comparison of columns 1 and 3 in Tables 6 and 7 shows that retraining
+
+13
+
+
+
+Table 8. Confusion matrix and metrics for TWNet5{32,16} on full CDSR dataset.
+
+Benign DoS DDoS Password PortScan XSS Amounts
+Benign 1457391 7583 1219 739 8367 11 1475310
+DoS 188 166558 79 159 31 0 167015
+DDoS 32 129 94440 0 0 13 94614
+Password 120 0 0 7600 0 30 7750
+PortScan 543 7 0 1 216315 0 216866
+XSS 23 0 0 631 0 7 661
+Total Found 1458297 174277 95738 9130 224713 61
+True Positive 1457391 166558 94440 7600 216315 7
+Recall 0.99 1.00 1.00 0.98 1.00 0.01
+Precision 1.00 0.96 0.99 0.83 0.96 0.11
+F1-Score 0.99 0.98 0.99 0.9 0.98 0.02
+
+dataset accuracy does not depend on training dataset accuracy. It is also shown that the
+accuracy on a dataset is higher if the model was previously trained on that dataset, even if it
+was consequently retrained on another dataset. The tables also show that PortScan generalize
+better than DoS due to higher similarity of PortScan features in both datasets.
+
+4.3 Confusion matrix, f1-score
+
+Table 8 shows the confusion matrix on full CDSR dataset for TWNet5{32,16} model trained
+on the training (80%) subset of CDSR. Such matrices were calculated for multiple runs showing
+low variance and the same characteristic patterns discussed below.
+
+Table 8 shows that the ration of missed attacks to all attacks is very low, varying between
+0.1 and 0.3% depending on the run, with most missed attacks being PortScans. The ratio
+of FP attacks to all benign is higher, reaching 1.2–1.3%, with 90% FP being mislabeled as
+PortScans and DoS. DDoS is mostly confused with DoS and never with Password or PortScan.
+Similarly, PortScan and Password are never confused with DDoS. PortScan is mostly confused
+with benign, and XSS is mostly confused with Password (95–97%).
+
+Table 9 shows f1-scores for each attack type calculated using the confusion matrix for
+comparison of our results with the results in prior publications. The following abbrebiations
+were used for datasets: UNSW-NB15 (NB15), BoT-IoT (BoT), ToN-IoT (ToN), UQ-NIDS
+(UQ), KDD CUP99 (CUP99), CIC-DarkNet (DN), CSE-CIC-IDS2018 (CSE). Prefix “NF”
+means Net FLow feature version of the dataset, “v2” means second version of the dataset,
+“R” means rectified version of the dataset. In “features” column the first number means the
+number of features used as input for the “method”, and the number in parentheses is the
+number of dataset fields used to calculate the features, as discussed in Section 3.2.
+
+The comparison shows that apart from poorly represented attacks, such as XSS, our
+results are comparable or better than the previously reported ones. In some cases, the authors
+obtained metrics only with a large number of features [1,6,9], which may indicate overfitting.
+Moreover in [5] reducing the number of features significantly degrades metrics.
+
+14
+
+
+
+Table 9. Comparison of f1-score for each attack type for various method and various datasets.
+
+dataset method features Benign DoS DDoS Pass Scan XSS
+NFNB15v2 [1] Extra Trees [1] 39 (43) 1.00 0.36 - - - -
+NFBoTv2 [1] Extra Trees 38 (43) 1.00 1.00 1.00 - - -
+NFToNv2 [1] Extra Trees 38 (43) 0.99 0.91 0.99 0.97 1.00 0.96
+NFUQv2 [1] Extra Trees 38 (43) 0.96 1.00 1.00 0.96 0.98 0.97
+CUP99 [9] CNN+LSTM [4] -a 0.94b 0.97b - - - -
+NSL_KDD [10] CNN+LSTM -a 0.99b 0.98b - - - -
+NB15 [11] CNN+LSTM -a 0.92b 0.53b - - - -
+BoT [12] e-GraphSage [5] 47 0.99 1.00 1.00 - - -
+NFBoT [22] e-GraphSage 12 0.42 0.47 0.39 - - -
+ToN [13] e-GraphSage 44 0.91 0.73 0.98 0.91 0.85 0.95
+NFToN [22] e-GraphSage 12 0.92 0 0.68 0.25 0.13 0
+NB15 [11] E-ResGAT [6] 39 (43) 1.00 0.05 - - - -
+DN [15] E-ResGAT 73 (77) 0.95 - - - - -
+CSE [16] E-ResGAT 73 (77) 0.98 0.96 0.99 - - -
+ToN [13] E-ResGAT 39 (39) 1.00 0.99 0.98 1.00 0.99 1.00
+BoT [22] GNN [7] 39 0.58 0.31 0.46 - - -
+NFBoTv2 [1]1 GNN 38 (43) 0.72 0.95 0.97 - - -
+NFCSE [22] GNN 39 0.98 0–0.87c 0-1.00c d - d
+
+NFCSEv2 [1] GNN 39 (43) 0.99 0–0.99c 0.79- d - d
+
+0.94c
+
+NB15 [11] CNN-BiLSTM [3] 10–100 (41) 0.93 0.19 - - - -
+CICIDS2017 [14] CNN-BiLSTM 10–50 (77) 1.0 1.00e 1.00e 0.99f 1.00 d
+
+CUP99 [9] FF [2] 125 (41) 1.00 1.00 - - - -
+ToN-R [8] GNN [8] 10 (11) 0.98 0.99 0.99 0.86 0.99 0.87
+CDSR TWNet5{32,16} 20 (11) 0.99 0.98 0.99 0.88- 0.98 0-
+(this work) (this work) 0.9 0.03
+ODS TWNet5{32,16} 20 (11) 1.0 0.87- - - 1.0 -
+(this work) (this work) 0.88
+
+a not mentioned,
+b reffered as accuracy in multi-classfication,
+c different types of this attack accounted separately,
+d mixed with other attack types,
+e DoS and DDoS combined in one class,
+f mentioned as BruteForce, without web variants of passwords attacks.
+
+15
+
+
+
+5 Conclusions
+In this paper we discuss the limitation of GNNs for NIDS and propose a sliding time window
+methodology for data processing and feature extraction. It showed good results when com-
+bined with simplistic neural network architectures illustrated by over 90% f1-score for most
+attacks in CICIDS2017. We propose to use fewer neural network input features calculated
+using a low number of simplest dataset fields available in nearly every NIDS dataset.
+
+The generalization capabilities of the methods were studied with an emphasis on data
+compatibility among various datasets. To conduct the generalization experiments the CI-
+CIDS2017 pcaps were used to create a more compatible version of the dataset, and another
+dataset with Benign, PortScan, and DoS traffic flows was collected in our network. The gen-
+eralization experiments showed that high generalization accuracy is hard to achieve mainly
+because of the differences in data patterns in different networks due to high variability of set-
+tings, including collector type and timeout interval, which makes learning the characteristic
+features of benign traffic extremely challenging. It is also shown that generalization accuracy
+increases even after a slight fine-tuning on the new dataset, with a detriment to the initial
+training dataset‘s accuracy. The highest generalization accuracy was shown for PortScans
+since these attacks had the most similar signatures in both datasets.
+
+We proposed the use of trainable activation functions that were very effective in separat-
+ing various features in interpretable manner. Using such functions while carefully choosing
+input features we were able to achieve high training and generalization accuracies with neu-
+ral networks with few or even no hidden layers. That is, we showed that high performance
+and generalization stability can be achieved by neural networks consisting only of trainable
+activations and a classifier head. We also showed that such neural networks are the least sus-
+ceptible to uncertainties due to random weight initialization which makes them more reliable
+in real-world applications.
+
+Acknowledgement
+Authors would like to thank Vasily Dolmatov for discussions and project supervision.
+
+Data Statement
+CDSR dataset is available on request for academic research purposes.
+
+References
+[1] M. Sarhan, S. Layeghy, and M. Portmann, “Towards a standard feature set for network
+
+intrusion detection system datasets,” Mobile Networks and Applications, vol. 27, no. 1, p.
+357–370, Nov. 2021. [Online]. Available: http://dx.doi.org/10.1007/s11036-021-01843-0
+
+[2] M. Maithem and G. A. Al-sultany, “Network intrusion detection system using deep
+neural networks,” Journal of Physics: Conference Series, vol. 1804, no. 1, p. 012138, feb
+2021. [Online]. Available: https://dx.doi.org/10.1088/1742-6596/1804/1/012138
+
+16
+
+http://dx.doi.org/10.1007/s11036-021-01843-0
+https://dx.doi.org/10.1088/1742-6596/1804/1/012138
+
+
+[3] A. A. Jihado and A. S. Girsang, “Hybrid deep learning network intrusion detection
+system based on convolutional neural network and bidirectional long short-term
+memory,” J. Adv. in Information Technology, vol. 15, no. 2, p. 219–232, Nov. 2024.
+[Online]. Available: http://dx.doi.org/10.12720/jait.15.2.219-232
+
+[4] J. Du, K. Yang, Y. Hu, and L. Jiang, “Nids-cnnlstm: Network intrusion detection clas-
+sification model based on deep learning,” IEEE Access, vol. 11, pp. 24 808–24 821, 2023.
+
+[5] W. W. Lo, S. Layeghy, M. Sarhan, M. Gallagher, and M. Portmann, “E-graphsage:
+A graph neural network based intrusion detection system for iot,” 2021. [Online].
+Available: https://arxiv.org/abs/2103.16329
+
+[6] L. Chang and P. Branco, “Graph-based solutions with residuals for intrusion
+detection: the modified e-graphsage and e-resgat algorithms,” 2021. [Online]. Available:
+https://arxiv.org/abs/2111.13597
+
+[7] R. Xu, G. Wu, W. Wang, X. Gao, A. He, and Z. Zhang, “Applying self-supervised
+learning to network intrusion detection for network flows with graph neural network,”
+2024. [Online]. Available: https://arxiv.org/abs/2403.01501
+
+[8] A. Raskovalov, N. Gabdullin, and V. Dolmatov, “Investigation and rectification of nids
+datasets and standardized feature set derivation for network attack detection with graph
+neural networks,” 2022. [Online]. Available: https://arxiv.org/abs/2212.13994
+
+[9] “Kdd cup 1999 data,” http://kdd.ics.uci.edu/databases/kddcup99/kddcup99.html, ac-
+cessed: 2016-12-15.
+
+[10] M. Tavallaee, E. Bagheri, W. Lu, and A. A. Ghorbani, “A detailed analysis of the kdd
+cup 99 data set,” in 2009 IEEE Symposium on Computational Intelligence for Security
+and Defense Applications, 2009, pp. 1–6.
+
+[11] N. Moustafa and J. Slay, “Unsw-nb15: a comprehensive data set for network intrusion
+detection systems,” in Proc MilCIS, 2015, pp. 1–6.
+
+[12] N. Koroniotis, N. Moustafa, E. Sitnikova, and B. Turnbull, “Towards the development of
+realistic botnet dataset in the internet of things for network forensic analytics: Bot-iot
+dataset,” 2018. [Online]. Available: https://arxiv.org/abs/1811.00701
+
+[13] A. Alsaedi, N. Moustafa, Z. Tari, A. Mahmood, and A. Anwar, “Ton iot telemetry
+dataset: A new generation dataset of iot and iiot for data-driven intrusion detection
+systems,” IEEE Access, vol. 8, pp. 165 130–165 150, 2020. [Online]. Available:
+https://www.unb.ca/cic/datasets/ids-2017.html
+
+[14] “Cic-ids2017 dataset,” https://www.unb.ca/cic/datasets/ids-2017.html, accessed: 2024-
+04-21.
+
+[15] A. Habibi Lashkari, G. Kaur, and A. Rahali, “Didarknet: A contemporary approach to
+detect and characterize the darknet traffic using deep image learning,” in Proceedings
+of the 2020 10th International Conference on Communication and Network Security,
+ser. ICCNS ’20. New York, NY, USA: Association for Computing Machinery, 2021, p.
+1–13. [Online]. Available: https://www.unb.ca/cic/datasets/darknet2020.html
+
+17
+
+http://dx.doi.org/10.12720/jait.15.2.219-232
+https://arxiv.org/abs/2103.16329
+https://arxiv.org/abs/2111.13597
+https://arxiv.org/abs/2403.01501
+https://arxiv.org/abs/2212.13994
+http://kdd.ics.uci.edu/databases/kddcup99/ kddcup99.html
+https://arxiv.org/abs/1811.00701
+https://www.unb.ca/cic/datasets/ids-2017.html
+https://www.unb.ca/cic/datasets/ids-2017.html
+https://www.unb.ca/cic/datasets/darknet2020.html
+
+
+[16] I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, “Toward generating a new
+intrusion detection dataset and intrusion traffic characterization,” in Proceedings of
+the 4th International Conference on Information Systems Security and Privacy -
+Volume 1: ICISSP,, INSTICC. SciTePress, 2018, pp. 108–116. [Online]. Available:
+https://www.unb.ca/cic/datasets/ids-2018.html
+
+[17] “Tranalyzer: Lightweight flow generator and packet analyser,” http://kdd.ics.uci.edu/
+databases/kddcup99/kddcup99.html, accessed: 2024-09-23.
+
+[18] “Tshark,” accessed: 2024-09-23. [Online]. Available: https://tshark.dev/
+
+[19] “Slowhttptest: a highly configurable tool that simulates some application layer denial of
+service attacks by prolonging http connections in different ways,” accessed: 2024-07-12.
+[Online]. Available: https://github.com/shekyan/slowhttptest
+
+[20] “Goldeneye: an http dos test tool,” accessed: 2024-07-12. [Online]. Available:
+https://github.com/jseidl/GoldenEye
+
+[21] Z. Liu, Y. Wang, S. Vaidya, F. Ruehle, J. Halverson, M. Soljačić, T. Y. Hou,
+and M. Tegmark, “Kan: Kolmogorov-arnold networks,” 2024. [Online]. Available:
+https://arxiv.org/abs/2404.19756
+
+[22] M. Sarhan, S. Layeghy, N. Moustafa, and M. Portmann, NetFlow Datasets for Machine
+Learning-Based Network Intrusion Detection Systems. Springer International Publishing,
+2021, p. 117–135. [Online]. Available: http://dx.doi.org/10.1007/978-3-030-72802-1_9
+
+18
+
+https://www.unb.ca/cic/datasets/ids-2018.html
+http://kdd.ics.uci.edu/databases/kddcup99/ kddcup99.html
+http://kdd.ics.uci.edu/databases/kddcup99/ kddcup99.html
+https://tshark.dev/
+https://github.com/shekyan/slowhttptest
+https://github.com/jseidl/GoldenEye
+https://arxiv.org/abs/2404.19756
+http://dx.doi.org/10.1007/978-3-030-72802-1_9
+
+	Introduction
+	NIDS datasets
+	CICIDS2017 dataset
+	Own Dataset
+
+	Methodology
+	Time-Window Processing of Datasets
+	Feature Engineering
+	Feature normalization with trainable activation functions
+	Neural Network Architectures
+	Training and verification details
+
+	Results and Discussion
+	Neural network generalization
+	Test of catastrophic forgetfulness and the ability to retrain
+	Confusion matrix, f1-score
+
+	Conclusions
+

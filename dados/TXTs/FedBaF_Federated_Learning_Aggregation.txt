@@ -1,0 +1,4232 @@
+
+FedBaF: Federated Learning Aggregation
+
+Biased by a Foundation Model
+
+Jong-Ik Park Srinivasa Pranav José M. F. Moura Carlee Joe-Wong
+
+Electrical and Computer Engineering
+Carnegie Mellon University
+
+Abstract
+
+Foundation models are now a major focus of leading technology organizations due to their
+ability to generalize across diverse tasks. Existing approaches for adapting foundation models
+to new applications often rely on Federated Learning (FL) and disclose the foundation model
+weights to clients when using it to initialize the global model. While these methods ensure client
+data privacy, they compromise model and information security. In this paper, we introduce
+Federated Learning Aggregation Biased by a Foundation Model (FedBaF), a novel method
+for dynamically integrating pre-trained foundation model weights during the FL aggregation
+phase. Unlike conventional methods, FedBaF preserves the confidentiality of the foundation
+model while still leveraging its power to train more accurate models, especially in non-IID and
+adversarial scenarios. Our comprehensive experiments use Pre-ResNet and foundation models
+like Vision Transformer to demonstrate that FedBaF not only matches, but often surpasses
+the test accuracy of traditional weight initialization methods by up to 11.4% in IID and up
+to 15.8% in non-IID settings. Additionally, FedBaF applied to a Transformer-based language
+model significantly reduced perplexity by up to 39.2%.
+
+1 Introduction
+
+Developing foundation models [1] has become a major focus for leading technology companies like
+
+OpenAI, Microsoft, and Amazon AWS. These deep learning models are often trained with vast
+
+amounts of high-quality data [2] and their ability to generalize across different tasks and domains
+
+has made them essential assets for industry, government, and academia. Foundation models have
+
+been applied to natural language processing (e.g., text generation, translation, summarization), im-
+
+age generation and recognition, healthcare diagnostics, finance predictive analytics, and customer
+
+service and virtual assistant tasks [3–7]. When a foundation model’s training data distribution
+
+∗Authors are partially supported by NSF Grant CNS-2409138, CNS-2106891, CNS-2312761, and CCF-2327905.
+Srinivasa Pranav is partially supported by NSF Graduate Research Fellowships (DGE-1745016, DGE-2140739) and
+an ARCS Fellowship.
+
+1
+
+
+Sensitive Data
+
+Foundation
+Model
+
+Pre-Training
+
+W
+eight Initialization
+
+Preparing the
+Foundation Models
+
+Distribute the 
+Global Model Infer Training Dataset
+
+FedB
+aF
+
+Server
+
+Clients
+
+Malicious 
+Client
+
+Figure 1: A visualization of a Model Inversion Attack. Since FedBaF does not initialize the global
+model with a pre-trained foundation model, it becomes difficult for malicious clients to reconstruct
+the pre-training data from the distributed global model.
+
+overlaps with a new application, it provides a robust starting point for fine-tuning and customiza-
+
+tion. Instead of training a model from scratch, with limited data and compute, we can leverage
+
+pre-trained foundation models to enable faster training.
+
+For many applications, data that could be used to customize or fine-tune foundation mod-
+
+els is often distributed across multiple clients, such as a network of clinics or small companies
+
+spread across different jurisdictions. For example, fine-tuning a recommendation model to fit a
+
+small company’s product offering may require data from clients in various regions; and adapting
+
+a healthcare model for a network of clinics would involve distributed, confidential data sources.
+
+Therefore, effective generalization requires access to diverse data from multiple clients with similar
+
+objectives [8].
+
+Federated Learning (FL) is a promising solution for fine-tuning these models without sharing
+
+client data: FL clients train models on diverse local data and a central FL server aggregates the
+
+client updates to build and refine a global model [9–14]. Using a foundation model to initialize the
+
+FL global model leads to effective customization that leverages diverse, distributed data without
+
+2
+
+
+
+directly accessing the client data [3,15]. However, there are significant risks associated with sending
+
+a foundation model to clients, as required in traditional FL fine-tuning methods.
+
+First, disclosing a foundation model’s weights to FL clients poses a significant security risk.
+
+For example, malicious actors could carry out membership inference attacks, identifying whether
+
+specific data was part of the foundation model’s training dataset. Then, an attacker could disrupt
+
+the global model’s training by introducing updates that degrade performance on the identified
+
+data [16–18]. Similarly, for model inversion attacks, attackers reverse-engineer the model weights
+
+to infer sensitive training data (see Figure 1) [19–21]. Protecting foundation models, often trained
+
+on sensitive, proprietary data, is critical for safeguarding the training data and maintaining model
+
+integrity [22,23].
+
+Second, in competitive business contexts, disclosing foundation model weights to clients risks
+
+leaking strategic insights and proprietary information to adversaries [4, 24]. This undermines a
+
+company’s competitive advantage and substantial investments in data collection and training.
+
+To address these challenges, we present Federated Learning Aggregation Biased by a Foundation
+
+Model (FedBaF). Rather than using a foundation model to initialize the global model, FedBaF is
+
+a novel method for server-side foundation model integration during the task-specific global model
+
+aggregation phase of each FL round (see Figure 2). Since the server uses the foundation model in the
+
+aggregation phase, FedBaF ensures that the foundation model is not disclosed to clients. FedBaF
+
+also gradually reduces the foundation model’s influence as training progresses, thereby improving
+
+personalization for the client pool’s data and matching or outperforming existing methods.
+
+FedBaF is particularly beneficial for a FL operator who owns the foundation model and needs
+
+to maintain security and integrity while fine-tuning it with a new set of clients. For instance, large
+
+technology companies such as Microsoft and Amazon, develop their own foundation models and
+
+often act as FL operators for domain-specific tasks across various industries.
+
+Our contributions:
+
+1) To the best of our knowledge, we are the first to propose an algorithm that integrates
+
+foundation models into FL without distributing the foundation model to clients.
+
+2) We provide theoretical analysis of FedBaF’s effectiveness that reveals how foundation
+
+models can promote convergence in non-IID (not independent and identically distributed) and
+
+3
+
+
+
+Pre-Trained 
+Foundation Model
+
+𝑤𝑝𝑟𝑒
+
+Initialize global model weights 𝑤0
+
+Select 𝑚 Clients 
+
+Update local models
+with 𝑤𝑡 and local data 𝐷𝑘
+
+Aggregate local models,
+
+and get aggregated model 𝑤𝑡+1
+′
+
+Integrate 𝑤𝑡+1
+′  and 𝑤𝑝𝑟𝑒,
+
+and get updated global model 𝑤𝑡+1
+
+Add 1 to 𝑡
+
+After get 𝑤𝑇,
+finish the federated learning process
+
+R
+e
+p
+e
+a
+t u
+
+n
+til 𝑡 re
+
+a
+ch
+
+e
+s to
+
+ 𝑇
+
+New Global Model
+𝑤𝑇
+
+Third-Party 
+Federated Learning Operator
+
+(Server Side)
+
+Server Side:
+
+Clients Side:
+
+Clients Side
+
+Figure 2: Visualization of FedBaF: in each FL round’s aggregation phase (after client updates),
+the server integrates a foundation model into the global model.
+
+non-convex settings.
+
+When client data distributions are biased or non-IID [25], e.g., different ratios or a lack of certain
+
+labels, clients optimize corresponding local objective functions and may send conflicting updates to
+
+the server that skew the global model [26]. In FedBaF, the foundation model continuously serves as
+
+a form of regularization and stabilizes the global model by reducing the influence of these conflicting
+
+updates during the aggregation phase [3, 7, 27,28].
+
+Furthermore, FedBaF uses a fixed foundation model as an anchor and continuously incorporates
+
+it throughout the FL training process. This adds a layer of protection from adversarial attacks
+
+beyond those introduced by disclosing foundation model weights – such as misclassification or
+
+backdoor attacks, where compromised clients feed malicious updates to the server [11,22].
+
+3) We conduct extensive empirical evaluation and show that FedBaF matches or exceeds
+
+the training performance of traditional weight initialization methods – with better test
+
+performance in 10 out of 14 cases. Our experiments use Pre-ResNet and more complex architec-
+
+tures like Vision Transformer and Transformer-based language models frequently used as foundation
+
+models [29, 30]. Compared to standard FedAvg [10] and FedProx [31], FedBaF achieves accuracy
+
+improvements of up to 10.8% in IID and up to 37.5% globally and 5.9% locally in non-IID set-
+
+tings. Simultaneously, FedBaF safeguards the foundation model. Similarly, applying FedBaF to a
+
+Transformer-based language model significantly reduced perplexity by up to 76.0%.
+
+4
+
+
+
+Under adversarial backdoor misclassification attacks, FedBaF demonstrates increased robust-
+
+ness by improving FedAvg and FedProx test performance by up to 19.4% in IID environments, up
+
+to 64.7% globally, and 7.2% locally in non-IID environments. Additionally, in 8 out of 12 cases,
+
+FedBaF was more robust than traditional weight initialization methods.
+
+We outline related works in Sec. 2. We then detail our approach, FedBaF, in Sec. 3. In Sec. 4, we
+
+present theoretical analysis and, in Sec. 5, we provide extensive experimental evaluation. Finally,
+
+we conclude our research findings and discussion in Sec. 6.
+
+2 Related Work
+
+Traditionally, pre-trained models are used in FL to initialize the weights of the global FL model.
+
+The server distributes this model to local clients, and the clients update it with their local data.
+
+Such fine-tuning can significantly improve the FL model by integrating data from new clients, as
+
+supported by studies like FPS [3] and FedPCL [28].
+
+Several works explore the use of foundation models in FL, particularly in scenarios with limited
+
+pre-training data [3]. This approach often involves using synthetic data [3, 32] for pre-training.
+
+Federated Prototype-wise Contrastive Learning (FedPCL) is a significant development that
+
+aims to improve communication efficiency in FL by using class prototypes [28]. FedPCL enhances
+
+personalized learning by having clients share class-specific information more effectively. It fuses rep-
+
+resentations from multiple pre-trained models (backbones) at each client, with prototypes serving
+
+as the primary medium of information exchange. The strategy reduces communication overhead
+
+and enables customizing local models without extensive weight synchronization.
+
+The related works discussed in this section achieve good performance, but they do not consider
+
+the significant security vulnerabilities that result from sharing a foundation model with local
+
+clients, which compromise data privacy and the integrity of the global model. Malicious clients
+
+with access to foundation models can exploit them through: Model Inversion Attacks, recovering
+
+original training data or sensitive attributes from the model’s outputs [19–21]; Membership Infer-
+
+ence Attacks, analyzing model predictions to determine whether specific data records were used
+
+in training [16–18]. These attacks compromise the security of the FL system, necessitating the
+
+5
+
+
+
+development of more secure methods for leveraging pre-trained foundation models in FL settings.
+
+FedBaF addresses these security challenges by not sharing the foundation model with clients
+
+during the weight initialization stage. Instead, it dynamically integrates the foundation model’s
+
+pre-trained weights during the aggregation phase of each training round.
+
+3 FedBaF Methodology
+
+In this section, we introduce FedBaF, whose approach is illustrated in Figure 2. During the ag-
+
+gregation phases of the FL training process, our FedBaF method repeatedly leverages pre-trained
+
+foundation model weights. For example, the pre-trained weights corresponding to feature extrac-
+
+tion layers provide valuable representation mappings that guide the new model’s feature extractor
+
+during training. This approach can also extend to other layers if the foundation and FL models
+
+share the same architecture. When the new FL model has different neural network layers from the
+
+foundation model, i.e, the classifier layers, these different layers’ parameters are randomly initialized
+
+and then trained using data from the client pool, as in standard FL.
+
+Algorithm 1 Federated Learning Aggregation Biased by a Foundation Model (FedBaF).
+
+1: Initialize global model weights w0
+
+2: for each round t = 0, 1, 2, . . . , T do
+3: m← max(C ·K, 1)
+4: St ← (random set of m clients)
+5: for each client k ∈ St in parallel do
+6: wk
+
+t+1 ← ClientUpdate(wt, Dk)
+7: end for
+8: w′
+
+t+1 ←
+∑
+
+k∈St
+
+nk∑
+k∈St
+
+nk
+wk
+t+1
+
+9: τt ←
+
+∥∥∥∥ w′
+t+1
+
+∥w′
+t+1∥
+
+− wt
+∥wt∥
+
+∥∥∥∥
+√
+t+1
+
+10: αt ← ψ
+τ0
+U(1, 2)
+
+11: wt+1 ← 1
+1+αtτt
+
+(w′
+t+1 + αtτt (wpre \wt))
+
+12: end for
+13: ClientUpdate(w, D)
+14: Initialize local model weights with w
+15: Update local model weights using local data D
+16: return updated model weights
+
+Algorithm 1 describes how FedBaF fits into the traditional FL framework by incorporating
+
+foundation model weights during aggregation, as illustrated in Lines 9-11 [10]. FedBaF is versatile
+
+6
+
+
+
+and can be embedded into many existing FL algorithms, e.g., SCAFFOLD [33], FedProx [31], or
+
+other FL strategies, by modifying their aggregation methods (Lines 8-11 ) and using their existing
+
+ClientUpdate(w, D) logic for clients’ local training in Line 13.
+
+Modifying FL aggregation. FedBaF’s aggregation process in each training round begins with
+
+the same step as FedAvg’s or many other FL algorithms’ aggregation, by computing a weighted
+
+sum of the updated model parameters from each client (Line 8 ). After this aggregation, in Line 11
+
+FedBaF incorporates the pre-trained model weights (wpre) into the global FL model, controlled by
+
+the factor τt defined in Line 9. Here, (wpre \wt) refers to the subset of layers from the foundation
+
+model (wpre) that have the same architecture as the corresponding layers in the global FL model
+
+(wt), ensuring that only compatible layers are used during aggregation.
+
+Designing τt. Our careful design of τt uses the L2 norm of the difference between consecutive
+
+normalized weights of w′
+t+1 and wt, divided by
+
+√
+t+ 1. This change in the model’s weights between
+
+rounds reflects how much the global model adapts to new client updates. The normalization
+
+prevents τt from becoming too large. The factor
+√
+t+ 1 ensures that, as training progresses, the
+
+influence of wpre gradually diminishes, but not too quickly, and wt+1 approaches the improving
+
+averaged weights w′
+t+1. This strategy is critical to keeping the global model flexible and effective,
+
+especially when client data differs from the data used to train the foundation model [33].
+
+Depending on the network architectures (e.g., the number of weights or scale of the initialized
+
+weights), the scale of τt can vary. In non-IID situations and during adversarial attacks, the factor
+
+τt becomes significant. In particular, a large τ can indicate the presence of non-IID data or an
+
+attack, as such scenarios often result in large differences in consecutive weight updates. To keep τt
+
+within a suitable range, we introduce the parameter αt in Line 10, which depends on τ0 and the
+
+hyper-parameter ψ. We empirically find that setting αt such that αtτ0 is less than 2 in the initial
+
+round (t = 0) prevents excessively large values that could overly bias the global model towards
+
+the foundation model. A lower bound of 1 for αtτ0 also ensures that the minimum impact of the
+
+foundation model is significant for small t. We thus ensure the influence of the foundation model
+
+in the critical initial training stages, while still allowing the global model to adapt as training
+
+progresses.
+
+Designing αt. Sampling αt from the uniform distribution ψ
+τ0
+U(1, 2) for every round makes it
+
+7
+
+
+
+difficult for clients to reverse-engineer the foundation model, thus meeting FedBaF’s model security
+
+guarantees. To see this, Line 11 can be rearranged for wpre as
+
+wpre =
+(1 + αtτt)wt+1 −w′
+
+t+1
+
+αtτt
+.
+
+In the worst-case scenario, where all local clients are malicious and collaborating to extract the
+
+foundation model’s weights, they can access τt, wt+1, and w′
+t+1. However, because αt is randomly
+
+chosen in each round t and known only to the server, the foundation model’s weights cannot be
+
+extracted. If α were static, even if the server did not disclose it, malicious clients could determine
+
+this constant value by solving the residual equations from two successive rounds,
+
+(1 + ατt)wt+1 −w′
+t+1
+
+ατt
+=
+
+(1 + ατt+1)wt+2 −w′
+t+2
+
+ατt+1
+.
+
+This would eventually reveal the foundation model’s weights. More details, along with empirical
+
+analysis on the role of αt and the security advantages of FedBaF are provided in Appendix G.
+
+We formally examine this idea in the next section.
+
+4 Theoretical Analysis of FedBaF
+
+In this section, we focus on deriving performance guarantees for FedBaF, focusing on its convergence
+
+properties. Sec. 4.1 examines the general convergence behavior of FedBaF, while Sec. 4.2 shows
+
+specifically on how FedBaF manages convergence in the presence of diverse, non-IID local client
+
+data distributions.
+
+The following notation, problem setup, and assumptions are used throughout our analysis.
+
+Given m clients, let the kth device’s training data be drawn from Dk. The FL problem can be
+
+formulated as the following global objective,
+
+min
+w
+
+1∑m
+k=1 nk
+
+m∑
+k=1
+
+nkfDk
+(w), (1)
+
+where w are model (usually, deep neural network) weights and the fDk
+are L-smooth local objective
+
+8
+
+
+
+functions. The convergence analysis presented in this section also makes the following standard
+
+assumptions made by [33] and detailed in Appendix E. Each client locally optimizes w using
+
+stochastic gradient descent, where the stochastic gradients are (i) unbiased and (ii) have bounded
+
+variance. We also assume (iii) bounded gradient dissimilarity: the norm of the difference between
+
+the gradient of the global objective and the gradients computed using different local objective
+
+functions is bounded.
+
+4.1 General Convergence Analysis
+
+Proposition 1. Let w∗ be a (bounded) local minimum of the global objective function in (1).
+
+Consider an FL algorithm that converges to w∗ and let w′
+t be its global model in each training
+
+round t. Suppose we run the same algorithm but using FedBaF for the aggregation, and let wt be
+
+the FedBaF global model at round t. Let αt satisfy
+
+αt <
+2∥w′
+
+t+1 −w∗∥2
+
+(∥wpre −w∗∥2 − ∥w′
+t+1 −w∗∥2)τt
+
+(2)
+
+for all t where ∥w′
+t+1 −w∗∥2 < ∥wpre −w∗∥2. Then ∀t ∥wt −w∗∥ < ∥w′
+
+t −w∗∥.
+
+This means that, at any given round t, FedBaF’s model weights are closer to w∗.
+
+Using the same restrictions on local and global learning rates placed by the FedAvg convergence
+
+analysis in [33], the aforementioned bounded gradient variance, bounded gradient dissimilarity, and
+
+L-smoothness assumptions ensure that our method converges to w∗ faster than FedAvg. Similar
+
+convergence rate arguments for other FL methods with appropriately modified aggregation can be
+
+shown, as discussed in Sec. 3.
+
+4.2 Effectiveness of FedBaF with Diverse Client Data
+
+This section shows the impact of integrating a foundation model close to the optimal weights on
+
+the learning process and convergence behavior in non-IID environments.
+
+In round t, client k uses multiple SGD steps to update the global model wt and obtains the
+
+local model wk
+t . Letting St represent the randomly selected set of active clients at time t, we define
+
+9
+
+
+
+δt as the maximum deviation of the client models from w∗:
+
+δt := max
+k∈St
+
+∥wk
+t −w∗∥.
+
+Aggregating the updated models from clients according to Alg. 1 Lines 8-10 forms the global model
+
+w′
+t, and then,
+
+δt ≥ ∥w′
+t −w∗∥.
+
+Assumption: Foundation Model Proximity. The foundation model’s pre-trained weights,
+
+wpre, are close to the optimal weights w∗, i.e., ∥wpre −w∗∥ ≤ γ for a small γ > 0. Furthermore,
+
+we assume that γ ≤ δt for earlier rounds (small t which makes τt ≫ 0), i.e., the foundation model
+
+is closer to the optimal model than clients’ local weights.
+
+These are reasonable assumptions in practice since selecting a foundation model with a large γ
+
+would correspond to selecting an unsuitable foundation model that hampers the training process.
+
+Proposition 2. Let w∗ be a (bounded) local minimum of the global objective function in (1).
+
+Consider an FL algorithm that converges to w∗ and let w′
+t be its global model. Consider FedBaF
+
+based on the same FL algorithm (with appropriately modified client updates and Lines 8-10 in
+
+Alg. 1) and let wt be the FedBaF global model. FedBaF’s global model error has an upper bound of
+
+∥wt −w∗
+t ∥ ≤
+
+δt+αtτtγ
+1+αtτt
+
+< δt.
+
+Similar to (29) in Sec. 4.1, we bounded the distance between the FedBaF global model wt and
+
+w∗ in terms of δt. Prop. 2 shows that the integration of the foundation model not only helps in
+
+stabilizing the learning process but also accelerates the convergence rate. The foundation model
+
+acts as a stabilizing factor and reduces the impact of this variance on the global model’s convergence.
+
+This is particularly significant in the early stages of learning with non-IID data, when local models’
+
+weights are more prone to diverge from each other.
+
+5 Experimental Evaluations
+
+In this section, we conduct a detailed evaluation of FedBaF’s performance on both local and global
+
+test datasets, comparing its performance to the no foundation model cases and weight initial-
+
+10
+
+
+
+a) From Tiny ImageNet-200 to CIFAR-10 (Pre-ResNet)
+
+b) From Weather Image to Rome Weather Image (Vision Transformer)
+
+IID (Global)
+
+IID (Global)
+
+Non-IID (Local)
+
+Non-IID (Local)
+
+Non-IID (Global)
+
+Non-IID (Global)
+
+Figure 3: FedBaF maintains higher test accuracy when used with FedAvg with different propor-
+tions of malicious clients, ζ (0%, 10%, 20%, 50%), and attack intensity, λ (1, 5), executing mis-
+classification attacks, under IID and non-IID settings. Three different foundation models, trained
+with different datasets, are used for three tasks. Red, blue, and gray bars respectively represent
+FedBaF, weight initialization, and no foundation model cases.
+
+ization algorithms for training FL models.
+
+• No foundation model: The global FL model is trained from scratch without weight initializa-
+
+tion or FedBaF (i.e., no use of foundation models).
+
+•Weight initialization: The global model’s initial weights are set to equal the foundation model’s
+
+weights, and the FL training then proceeds as usual.
+
+We aim to 1) illustrate that FedBaF offers security advantages over weight initialization while
+
+attaining equivalent performance. Furthermore, by verifying how τt in line 9 of Algorithm 1 con-
+
+verges to 0, we also 2) establish FedBaF’s ability to effectively adapt the influence of the foundation
+
+model.
+
+More detailed testing results are provided in Appendix C, including the 1) computational
+
+efficiency of FedBaF and 2) additional evaluations using foundation models of varying quality
+
+trained on different amounts of data and real-world foundation model weights that are officially
+
+available online.
+
+11
+
+
+
+a) From Tiny ImageNet-200 to CIFAR-10 (Pre-ResNet)
+
+b) From Weather Image to Rome Weather Image (Vision Transformer)
+
+IID (Global)
+
+IID (Global)
+
+Non-IID (Local)
+
+Non-IID (Local)
+
+Non-IID (Global)
+
+Non-IID (Global)
+
+Figure 4: FedBaF maintains higher test accuracy than both baselines when used with FedProx
+with different proportions of malicious clients, attack intensity, and IID as well as non-IID settings.
+All other settings are identical to those in Figure 3.
+
+5.1 Experimental Setup
+
+Our experiments with popular image classification tasks encompass experiments using the CIFAR-
+
+10 and Rome Weather Image [34] datasets. We use Pre-ResNet and Vision Transformer [35] archi-
+
+tectures as Vision Transformers are popular foundation model architectures known for achieving
+
+remarkable performance [36] for ImageNet challenges [35]. We train the foundation models on the
+
+Tiny ImageNet-200 and Weather Image [37] datasets. Our evaluations consider both IID and non-
+
+IID settings (see Appendix A) [38, 39]. To demonstrate FedBaF’s generalizability to other tasks,
+
+we also evaluate it on a next-word prediction task using a Transformer language model pre-trained
+
+on the WikiText-2 dataset and tested on the Penn Treebank dataset.
+
+Attack setup. To assess security robustness of FedBaF, we randomly shuffle local data labels
+
+for a subset of clients, treating them as backdoor attackers aiming to induce misclassification. We
+
+also increase the attack intensity by varying the number of local epochs for malicious clients. For
+
+image classification tasks (Pre-ResNet and Vision Transformer), we increase the local epochs by a
+
+factor λ > 1, which introduces more bias from the initial global model and strengthens the attack’s
+
+impact. For the language task (Transformer), we decrease the local epochs by a factor 1/λ < 1 to
+
+12
+
+
+
+a) FedAvg
+
+b) FedProx
+
+From WikiText-2 to Penn Treebank (Transformer)
+
+Figure 5: FedBaF maintains lower test perplexity when used with FedAvg and FedProx with
+different proportions of malicious clients and attack intensities. Note: lower perplexity is
+better
+
+prevent convergence to a small loss, ensuring the calculated perplexity remains high regardless of
+
+misclassification, thereby intensifying the attack. We vary the proportion of attacking clients, ζ,
+
+and evaluate algorithm resiliency when 0%, 10%, 20%, and 50% of the client base are attackers.
+
+Evaluation metrics. To evaluate testing performance, we calculate the global testing accuracy
+
+using a global test dataset after the aggregation phase of an FL round. In non-IID settings, we
+
+also use local test datasets that are extracted from the global test dataset and reflect the class
+
+distribution of the local clients. After local training and prior to aggregation, we test the local
+
+models to determine an average local testing accuracy. For the Transformer model, we use global
+
+perplexity to assess the performance of the global language model. Perplexity is inversely related
+
+to how well a probability model predicts a sample.
+
+Details of other deep neural network architectures employed in our experiments and additional
+
+training specifics are provided in Tables 2 and 1 in Appendix A.
+
+13
+
+
+
+5.2 Experimental Results
+
+Figures 3, 4, and 5 display the extensive test accuracy/perplexity evaluation results for FedBaF
+
+and our two baselines (no foundation model and weight initialization). We evaluate these three
+
+methods using both FedAvg and FedProx [31] as the base FL training algorithms. We incorporate
+
+FedBaF into FedProx by modifying Line 8 and the ClientUpdate routine in Algorithm 1, including
+
+both IID and non-IID settings, with one non-adversarial scenario and four adversarial scenarios.
+
+We use FedProx’s usual aggregation equation w′
+t+1 ←
+
+∑
+k∈St
+
+nk∑
+k∈St
+
+nk
+wk
+t+1−µ(wk
+
+t+1−wt). Here, µ
+
+represents the regularization term that controls the trade-off between the local and global objectives.
+
+FedBaF then incorporates the foundation model weights as in Lines 9-11 of Algorithm 1.
+
+5.2.1 Testing Performance Enhancements
+
+In non-adversarial scenarios, FedBaF showcased superior testing performance compared to the no
+
+foundation model and weight initialization methods across both IID and non-IID configurations.
+
+Figures 3 and 4 respectively show the test accuracies of all three methods using FedAvg and
+
+FedProx for both Pre-ResNet and the Vision Transformer. In comparison to Pre-ResNet trained
+
+with no foundation model, FedBaF improved the global model’s accuracy by 1.3% for FedAvg and
+
+1.6% for FedProx in IID scenarios, and by 21.8% for FedAvg and 22.6% for FedProx in non-IID
+
+scenarios. For the Vision Transformer, global performance improvements from FedBaF relative
+
+to no foundation model by 10.8% for FedAvg and 0.0% for FedProx in IID settings and 37.5%
+
+for FedAvg and 15.8% for FedProx in non-IID settings. We thus observe that both FedAvg
+
+and FedProx benefit from FedBaF’s inclusion of the foundation model, with particular
+
+benefits in the more challenging scenario with non-IID client data. Intuitively, non-IID data tends
+
+to slow FL convergence, which is mitigated by incorporating the foundation model.
+
+The weight initialization method, which also incorporates a foundation model but does not keep
+
+it private, exhibits similar performance gains as FedBaF compared to training without a foundation
+
+model. For example, on Pre-ResNet weight initialization exhibited global performance gains of
+
+19.7% for FedAvg and 20.4% for FedProx in non-IID scenarios, while on Vision Transformers it
+
+achieves gains of 18.8% for both FedAvg and FedProx in non-IID scenarios.
+
+14
+
+
+
+In the next-word prediction task using a Transformer, FedBaF significantly outperformed train-
+
+ing with no foundation model, reducing perplexity by 76.0% with FedAvg, whereas weight initial-
+
+ization yielded a 67.8% decrease relative to training without a foundation model with FedAvg.
+
+Collectively, these findings indicate negligible differences between the test accuracies at-
+
+tained by FedBaF and those achieved with weight initialization, despite the fact that
+
+unlike weight initialization, FedBaF does not reveal the foundation model weights to FL clients.
+
+Moreover, FedBaF showed better testing performance than the weight initialization or no founda-
+
+tion model methods in 10 out of the 14 experiment settings.
+
+5.2.2 Robustness to Attacks
+
+FedBaF remains effective in maintaining robustness against misclassification attacks, showing a
+
+more modest performance decline than both baseline methods.
+
+We next evaluate the robustness of FedBaF and our two baselines to adversarial clients. As
+
+the proportion of attacking clients (ζ in Figures 3, 4, and 5) increases, test accuracy declines in all
+
+cases, as we would intuitively expect since even FedBaF is not designed to perfectly defend against
+
+these attacks, which become more effective as more clients act as attackers.
+
+The test accuracy for the no foundation model method especially drops significantly when 50%
+
+of the clients are attackers and the attack intensity λ = 5. For Pre-ResNet under such attacks,
+
+there is a global performance decrease compared to the case with no attackers of 11.8% for FedAvg
+
+and 11.2% for FedProx in IID scenarios and 38.2% for FedAvg and 37.4% for FedProx in non-
+
+IID scenarios. For Vision Transformer, these accuracy drops are 32.4% for FedAvg and 34.2% for
+
+FedProx in IID and 21.9% for FedAvg and 25.0% for FedProx in non-IID scenarios. Thus, the no
+
+foundation model training method is vulnerable to attacks in both IID and non-IID
+
+settings, as we would expect since it has no built-in defenses.
+
+In contrast, FedBaF experiences a much more modest performance decline under
+
+attack, demonstrating its robustness. For Pre-ResNet, FedBaF’s global performance decreases by
+
+6.0% for FedAvg and 6.4% for FedProx in IID settings and by 16.5% for FedAvg and 16.3% for
+
+FedProx in non-IID settings, where the decrease is again measured for the most intense attack (ζ =
+
+50%, λ = 5 relative to no attack. These accuracy drops are less than half of those experienced by
+
+15
+
+
+
+the no foundation model method. For Vision Transformer, FedBaF’s global performance decreases
+
+by only 4.9% for FedAvg and FedProx in IID settings and by 25% for both FedAvg and FedProx
+
+in non-IID settings.
+
+We finally see from the results for the weight initialization method that näıvely incorporating
+
+the foundation model still confers some robustness to attacks, though weight initialization reveals
+
+the foundation model weights to clients. Weight initialization shows a performance decrease of
+
+6.4% for FedAvg and 6.9% for FedProx in IID settings and by 17.5% for FedAvg and 17.2% for
+
+FedProx in non-IID settings globally for Pre-ResNet. For Vision Transformer, the decreases are
+
+14.6% for both FedAvg and FedProx in IID settings and by 18.4% for both FedAvg and FedProx
+
+in non-IID settings globally.
+
+These findings demonstrate that, similar to weight initialization, FedBaF offers considerable
+
+attack robustness compared to training with no foundation model. In 8 out of 12 cases, Fed-
+
+BaF shows the minimum decrease in performance across all three methods, indicating its superior
+
+effectiveness in maintaining robustness under adversarial conditions.
+
+6 Conclusion
+
+This paper introduced Federated Learning Aggregation Biased by a Foundation Model (FedBaF).
+
+FedBaF enhances adaptability and security in dynamic FL scenarios without sharing the foundation
+
+model with clients. This is crucial in environments with ever-changing data and non-IID scenarios,
+
+where foundation models are used across several domains as seed models. Our findings show that
+
+FedBaF increases resilience against adversarial attacks while matching or outperforming traditional
+
+weight initialization performance in both IID and non-IID settings.
+
+16
+
+
+
+References
+
+[1] W. Zhuang, C. Chen, and L. Lyu, “When foundation model meets federated learning: Moti-
+
+vations, challenges, and future directions,” 2024.
+
+[2] R. Bommasani, D. A. Hudson, E. Adeli, R. Altman, S. Arora, S. von Arx, M. S. Bernstein,
+
+J. Bohg, A. Bosselut, E. Brunskill, et al., “On the opportunities and risks of foundation
+
+models,” arXiv preprint arXiv:2108.07258, 2021.
+
+[3] H.-Y. Chen, C.-H. Tu, Z. Li, H. W. Shen, and W.-L. Chao, “On the importance and appli-
+
+cability of pre-training for federated learning,” in The Eleventh International Conference on
+
+Learning Representations, 2022.
+
+[4] X. Han, Z. Zhang, N. Ding, Y. Gu, X. Liu, Y. Huo, J. Qiu, Y. Yao, A. Zhang, L. Zhang, et al.,
+
+“Pre-trained models: Past, present and future,” AI Open, vol. 2, pp. 225–250, 2021.
+
+[5] M. Duan, D. Liu, X. Ji, Y. Wu, L. Liang, X. Chen, Y. Tan, and A. Ren, “Flexible clustered
+
+federated learning for client-level data distribution shift,” IEEE Transactions on Parallel and
+
+Distributed Systems, vol. 33, no. 11, pp. 2661–2674, 2021.
+
+[6] M. Joshi, A. Pal, and M. Sankarasubbu, “Federated learning for healthcare domain - pipeline,
+
+applications and challenges,” ACM Trans. Comput. Healthcare, vol. 3, nov 2022.
+
+[7] J. Yosinski, J. Clune, Y. Bengio, and H. Lipson, “How transferable are features in deep neural
+
+networks?,” Advances in Neural Information Processing Systems, vol. 27, 2014.
+
+[8] S. Pranav and J. M. Moura, “Peer-to-peer deep learning for beyond-5g iot,” arXiv preprint
+
+arXiv:2310.18861, 2023.
+
+[9] Q. Li, Z. Wen, Z. Wu, S. Hu, N. Wang, Y. Li, X. Liu, and B. He, “A survey on federated
+
+learning systems: Vision, hype and reality for data privacy and protection,” IEEE Transactions
+
+on Knowledge and Data Engineering, 2021.
+
+[10] B. McMahan, E. Moore, D. Ramage, S. Hampson, and B. A. y Arcas, “Communication-efficient
+
+17
+
+
+
+learning of deep networks from decentralized data,” in Artificial Intelligence and Statistics,
+
+pp. 1273–1282, PMLR, 2017.
+
+[11] L. Lyu, H. Yu, J. Zhao, and Q. Yang, Threats to Federated Learning, pp. 3–16. Cham: Springer
+
+International Publishing, 2020.
+
+[12] D. C. Nguyen, M. Ding, P. N. Pathirana, A. Seneviratne, J. Li, and H. V. Poor, “Federated
+
+learning for internet of things: A comprehensive survey,” IEEE Communications Surveys &
+
+Tutorials, vol. 23, no. 3, pp. 1622–1658, 2021.
+
+[13] M. Siew, H. Zhang, J.-I. Park, Y. Liu, Y. Ruan, L. Su, S. Ioannidis, E. Yeh, and C. Joe-
+
+Wong, “Fair concurrent training of multiple models in federated learning,” arXiv preprint
+
+arXiv:2404.13841, 2024.
+
+[14] A. Singh, P. Vepakomma, O. Gupta, and R. Raskar, “‘detailed comparison of communication
+
+efficiency of split learning and federated learning,” arXiv preprint arXiv:1909.09145, 2019.
+
+[15] J. Nguyen, K. Malik, M. Sanjabi, and M. Rabbat, “Where to begin? exploring the impact of
+
+pre-training and initialization in federated learning,” arXiv preprint arXiv:2206.15387, 2022.
+
+[16] S. Dayal, D. Alhadidi, A. Abbasi Tadi, and N. Mohammed, “Comparative analysis of member-
+
+ship inference attacks in federated learning,” in Proceedings of the 27th International Database
+
+Engineered Applications Symposium, pp. 185–192, 2023.
+
+[17] H. Hu, Z. Salcic, L. Sun, G. Dobbie, P. S. Yu, and X. Zhang, “Membership inference attacks
+
+on machine learning: A survey,” ACM Computing Surveys (CSUR), vol. 54, no. 11s, pp. 1–37,
+
+2022.
+
+[18] X. Wang, N. Wang, L. Wu, Z. Guan, X. Du, and M. Guizani, “Gbmia: Gradient-based mem-
+
+bership inference attack in federated learning,” in ICC 2023-IEEE International Conference
+
+on Communications, pp. 5066–5071, IEEE, 2023.
+
+[19] M. Fredrikson, S. Jha, and T. Ristenpart, “Model inversion attacks that exploit confidence
+
+information and basic countermeasures,” in Proceedings of the 22nd ACM SIGSAC conference
+
+on computer and communications security, pp. 1322–1333, 2015.
+
+18
+
+
+
+[20] J. Li, A. S. Rakin, X. Chen, Z. He, D. Fan, and C. Chakrabarti, “Ressfl: A resistance transfer
+
+framework for defending model inversion attack in split federated learning,” in Proceedings of
+
+the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 10194–10202,
+
+2022.
+
+[21] Y. Zhang, R. Jia, H. Pei, W. Wang, B. Li, and D. Song, “The secret revealer: Generative model-
+
+inversion attacks against deep neural networks,” in Proceedings of the IEEE/CVF conference
+
+on computer vision and pattern recognition, pp. 253–261, 2020.
+
+[22] E. Bagdasaryan, A. Veit, Y. Hua, D. Estrin, and V. Shmatikov, “How to backdoor federated
+
+learning,” in International conference on artificial intelligence and statistics, pp. 2938–2948,
+
+PMLR, 2020.
+
+[23] T. Kim, J. Li, N. Madaan, S. Singh, and C. Joe-Wong, “Adversarial robustness unhardening
+
+via backdoor attacks in federated learning,” in NeurIPS 2023 Workshop on Backdoors in Deep
+
+Learning-The Good, the Bad, and the Ugly, 2023.
+
+[24] J. Yu, Y. Wang, C. Zhao, B. Ghanem, and J. Zhang, “Freedom: Training-free energy-guided
+
+conditional diffusion model,” in Proceedings of the IEEE/CVF International Conference on
+
+Computer Vision (ICCV), pp. 23174–23184, October 2023.
+
+[25] S. Pranav and J. M. Moura, “Peer-to-peer learning+ consensus with non-iid data,” in 2023
+
+57th Asilomar Conference on Signals, Systems, and Computers, pp. 709–713, IEEE, 2023.
+
+[26] Y. Zhao, M. Li, L. Lai, N. Suda, D. Civin, and V. Chandra, “Federated learning with non-iid
+
+data,” arXiv preprint arXiv:1806.00582, 2018.
+
+[27] Z. Li, K. Ren, X. Jiang, B. Li, H. Zhang, and D. Li, “Domain generalization using pretrained
+
+models without fine-tuning,” arXiv preprint arXiv:2203.04600, 2022.
+
+[28] Y. Tan, G. Long, J. Ma, L. Liu, T. Zhou, and J. Jiang, “Federated learning from pre-trained
+
+models: A contrastive learning approach,” Advances in Neural Information Processing Sys-
+
+tems, vol. 35, pp. 19332–19344, 2022.
+
+19
+
+
+
+[29] P. Xu, X. Zhu, and D. A. Clifton, “Multimodal learning with transformers: A survey,” IEEE
+
+Transactions on Pattern Analysis and Machine Intelligence, vol. 45, no. 10, pp. 12113–12132,
+
+2023.
+
+[30] T. Kenneweg, P. Kenneweg, and B. Hammer, “Foundation model vision transformers are great
+
+tracking backbones,” in 2024 International Conference on Artificial Intelligence, Computer,
+
+Data Sciences and Applications (ACDSA), pp. 1–6, IEEE, 2024.
+
+[31] T. Li, A. K. Sahu, M. Zaheer, M. Sanjabi, A. Talwalkar, and V. Smith, “Federated optimization
+
+in heterogeneous networks,” Proceedings of Machine learning and systems, vol. 2, pp. 429–450,
+
+2020.
+
+[32] S. I. Nikolenko, Synthetic data for deep learning, vol. 174. Springer, 2021.
+
+[33] S. P. Karimireddy, S. Kale, M. Mohri, S. Reddi, S. Stich, and A. T. Suresh, “Scaffold: Stochas-
+
+tic controlled averaging for federated learning,” in International conference on machine learn-
+
+ing, pp. 5132–5143, PMLR, 2020.
+
+[34] R. Vaz, “Rome weather classification.” https://www.kaggle.com/datasets/rogeriovaz/
+
+rome-weather-classification, 2021. Accessed: 2024-05-21.
+
+[35] A. Dosovitskiy, L. Beyer, A. Kolesnikov, D. Weissenborn, X. Zhai, T. Unterthiner, M. De-
+
+hghani, M. Minderer, G. Heigold, S. Gelly, et al., “An image is worth 16x16 words: Trans-
+
+formers for image recognition at scale,” arXiv preprint arXiv:2010.11929, 2020.
+
+[36] C. Zhou, Q. Li, C. Li, J. Yu, Y. Liu, G. Wang, K. Zhang, C. Ji, Q. Yan, L. He, et al., “A
+
+comprehensive survey on pretrained foundation models: A history from bert to chatgpt,” arXiv
+
+preprint arXiv:2302.09419, 2023.
+
+[37] H. Xiao, “Weather phenomenon database (WEAPD),” 2021.
+
+[38] J.-I. Park and C. Joe-Wong, “Federated learning with flexible architectures,” in Joint Euro-
+
+pean Conference on Machine Learning and Knowledge Discovery in Databases, pp. 143–161,
+
+Springer, 2024.
+
+20
+
+https://www.kaggle.com/datasets/rogeriovaz/rome-weather-classification
+https://www.kaggle.com/datasets/rogeriovaz/rome-weather-classification
+
+
+[39] E. Diao, J. Ding, and V. Tarokh, “Heterofl: Computation and communication efficient feder-
+
+ated learning for heterogeneous clients,” arXiv preprint arXiv:2010.01264, 2020.
+
+21
+
+
+
+Appendix Overview
+
+This appendix provides additional details and results to complement the main text, offering further
+
+insight into the experimental setup, theoretical analysis, and security considerations for FedBaF.
+
+The appendix is organized as follows:
+
+Experimental Setup in Section A
+
+This section details the experimental configurations, including data distributions, network archi-
+
+tectures for vision and language tasks, and hyper-parameters under IID and non-IID settings.
+
+Formulas for Evaluating Computational Complexity in Section B
+
+We present the mathematical formulas used to compute the computational complexity of the Fed-
+
+BaF algorithm, specifically focusing on multiply-accumulate (MAC) operations across clients and
+
+training rounds.
+
+Additional Experimental Evaluations in Section C
+
+This section includes supplementary experimental results, analyzing the effect of varying foundation
+
+model quality on FedBaF’s performance and comparisons using the official pre-trained foundation
+
+model. Computational complexity is also compared to scenarios without foundation models and
+
+weight initialization.
+
+Training Curves in Section D
+
+We provide training curves that display the progression of model accuracy over training epochs for
+
+the Pre-ResNet and Vision Transformer models, illustrating comparisons between FedBaF, weight
+
+initialization, and without foundation model cases under IID and non-IID conditions.
+
+Convergence Analysis in Section E
+
+This section provides a theoretical analysis of FedBaF’s convergence properties, detailing how
+
+the algorithm performs under different client data distributions and demonstrating the theoretical
+
+22
+
+
+
+guarantees for its performance.
+
+Proofs of Propositions in Section F
+
+In this section, we include the formal proofs of Propositions 1 and 2, outlined in the theoretical anal-
+
+ysis in Section 4, which support the claims made regarding FedBaF’s performance and convergence
+
+behavior.
+
+Security Analysis in the Presence of Adversarial Attacks in Section G
+
+This section provides an in-depth security analysis of FedBaF, focusing on its robustness against
+
+adversarial attacks such as misclassification and backdoor attacks. We compare FedBaF’s resilience
+
+to malicious clients with traditional methods, showing how FedBaF mitigates the negative impact
+
+of attacks and preserves global model integrity.
+
+23
+
+
+
+A Experimental Setup
+
+Table 1: The specific conditions under which our experiments were conducted, including data
+distribution and model training settings.
+
+Evaluation Pretrained Model Training
+
+Performance Comparison
+
+From Tiny
+
+ImageNet-200
+
+From
+
+Weather Image
+
+From
+
+WikiText-2
+
+From ImageNet 
+
+(PyTorch)
+
+IID Non-IID IID Non-IID - IID Non-IID
+
+Number of clients 1 100 10 100 100
+
+Fraction of active clients C 1 0.1
+
+Number of classes
+
+for each client
+100 11 - 10 2 5 2 - 10 2
+
+Number of samples
+
+for each client
+
+50,000
+
+~ 100,000
+
+2,500
+
+~ 5,000
+
+640,000
+
+~ 1,280,000 
+125 ~ 250 10 ~ 20 7,680 ~ 8960 125 ~ 250
+
+Data
+Tiny
+
+ImageNet-200
+Weather Image WikiText-2 CIFAR-10
+
+Rome
+
+Weather Image
+
+Penn
+
+Treebank
+CIFAR-10
+
+Model Pre-ResNet
+Vision
+
+Transformer
+Transformer Pre-ResNet
+
+Vision
+
+Transformer
+Transformer
+
+Vision
+
+Transformer
+
+Local epochs E 300 300 300 5
+
+Local mini-batch size B 128 50 50 128 125
+
+Communication rounds 1 200 250 200 250 200 200 250
+
+Optimizer SGD
+
+Momentum 0.9
+
+Weight decay 1e-4
+
+Learning rate 𝜂 0.1 0.01 0.01 0.1 0.01
+
+Learning rate 0.1x
+
+decay schedule
+[150, 225] [150, 225] Not applied Not applied
+
+Batch normalization layer Non-static
+
+𝝁 for proximal term
+
+in FedProx
+Not applied 0.01 Not applied 0.01
+
+In this section, we provide details about our experimental setup and network architectures. For
+
+vision tasks using Pre-ResNets and Vision Transformers, we conduct evaluations in both IID and
+
+non-IID environments. In IID settings, each client’s data distribution is uniform across all classes,
+
+with an equal number of samples from each class. In non-IID settings, clients receive samples
+
+from only 20% of the dataset’s classes for CIFAR-10 and 50% of the dataset’s classes for Rome
+
+Weather Image, but maintain an equal number of samples for each class they have. During local
+
+training in these settings, clients zero out logits for classes not present in their data. For language
+
+tasks using Transformers, each client has specific numbers of tokenized words grouped sequentially.
+
+Details of the experimental settings can be found in Table 1.
+
+For the network architecture configuration, details for Pre-ResNets and Transformers can be
+
+found in Table 2. For Vision Transformer, we used the standard ViT B 16 model with no modifi-
+
+cations except changing the last output layers according to the new data. This model was obtained
+
+from the PyTorch library. Additionally, we also tested FedBaF with official pre-trained foundation
+
+model weights that are available online (not developed by us). We specifically used the ImageNet
+
+24
+
+
+
+pre-trained weights for a standard Vision Transformer from PyTorch’s official model repository:
+
+(ViT B 16 Weights.IMAGENET1K SWAG E2E V1).
+
+Table 2: This table presents the detailed structures of the neural networks (Pre-ResNet and Trans-
+former) utilized in our Federated Learning experiments and making foundation models.
+Model Section 1 Section 2 Section 3 Section 4 Section 5 Section 6 Section 7 Section 8
+
+P
+re
+
+-R
+es
+
+N
+et
+
+3 × 3, 64 × 1
+3 × 3, 64
+
+3 × 3, 64
+× 2
+
+3 × 3,128
+
+3 × 3,128
+× 2
+
+3 × 3, 256
+
+3 × 3, 256
+× 2
+
+3 × 3, 512
+
+3 × 3, 512
+× 2 𝑁𝑐𝑙𝑎𝑠𝑠𝑒𝑠-d fc
+
+Model
+Encoder Decoder
+
+Classifier
+Attention FeedForward Attention FeedForward Attention FeedForward Attention FeedForward
+
+T
+ra
+
+n
+sf
+
+o
+rm
+
+er
+
+192-d fc
+
+64-d fc
+
+3 × 3, 64
+
+3 × 3,64
+× 2
+
+192-d fc
+
+64-d fc
+
+3 × 3, 64
+
+3 × 3,64
+× 2 𝑁𝑡𝑜𝑘𝑒𝑛-d fc 𝑁𝑡𝑜𝑘𝑒𝑛-d fc
+
+192-d fc
+
+64-d fc
+
+3 × 3, 64
+
+3 × 3,64
+× 1
+
+192-d fc
+
+64-d fc
+
+3 × 3, 64
+
+3 × 3,64
+× 1 𝑁𝑡𝑜𝑘𝑒𝑛-d fc
+
+25
+
+
+
+B Formulas for Evaluating Computational Complexity
+
+In this section, we provide metrics for evaluating the computational complexity, as discussed in
+
+Section C.3.
+
+To evaluate computational complexity, we track the number of multiply-accumulate (MAC)
+
+operations, denoted as MACS. MACSk represents the number of MAC operations required to
+
+process all the local data samples held by client k. The average MAC per client, denoted as MACS,
+
+is calculated by averaging the MACS values for all clients participating in a single round of FL:
+
+MACS =
+1
+
+m
+
+m∑
+k=1
+
+MACSk
+
+Here, m is the number of participating clients in the given round. For each local training epoch,
+
+the computational complexity, referred to as MACE (Multiply-Accumulate Complexity per Epoch),
+
+is calculated as:
+
+MACE = m× ñ×MACS.
+
+Here, ñ is the median number of data samples per client. This metric reflects the computational
+
+load incurred by m clients during local training in each epoch.
+
+To compute the total computational load for the entire FL system, denoted as TMAC (To-
+
+tal Multiply-Accumulate Complexity), we multiply the number of local epochs E, the number of
+
+aggregation rounds T , and the previously calculated MACE:
+
+TMAC = T × E ×MACE.
+
+This provides the total number of MAC operations required for the entire training process across
+
+all clients and rounds, accounting for both the number of local epochs and the aggregation rounds
+
+in the FL system.
+
+26
+
+
+
+C Additional Experimental Evaluations
+
+In this section, we present additional experimental results that provide further insight into the
+
+performance of FedBaF across various tasks and scenarios. These evaluations focus on the impact
+
+of different qualities of foundation models, the application of the real pre-trained foundation model,
+
+and computational complexities. We compare the use of foundation models in both IID and non-IID
+
+settings with weight initialization and cases where no foundation model is used.
+
+C.1 Differentiating the Quality of Pre-Trained Foundation Models
+
+Table 3: Image classification test accuracy results for Pre-ResNet using the no foundation, weight
+initialization, and FedBaF methods (best of 3 trials).
+
+FedAvg
+
+Pre-trained
+
+Samples
+
+Malicious Clients (ζ)
+
+Attack Intensity (λ)
+
+IID - Global Testing Accuracy Non-IID - Local Testing Accuracy Non-IID – Global Testing Accuracy
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+50,000
+
+ζ=0%, λ=1 82.9 84.1 84.0 95.6 98.0 98.2 57.3 68.6 69.8
+
+ζ=10%, λ=1 81.7 82.4 82.8 95.1 97.5 98.1 49.0 62.1 63.8
+
+ζ=20%, λ=1 80.1 81.0 82.0 94.0 97.3 97.6 43.6 57.3 58.2
+
+ζ=50%, λ=1 73.0 78.2 78.6 85.9 90.3 91.3 39.4 56.6 57.7
+
+ζ=50%, λ=5 73.1 78.7 79.0 87.7 93.4 94.0 35.4 56.6 58.3
+
+100,000
+
+ζ=0%, λ=1 82.9 85.9 85.9 95.6 98.4 98.6 57.3 71.9 73.4
+
+ζ=10%, λ=1 81.7 84.3 84.8 95.1 98.0 98.3 49.0 64.2 67.0
+
+ζ=20%, λ=1 80.1 83.5 83.7 94.0 97.5 97.9 43.6 59.8 61.9
+
+ζ=50%, λ=1 73.0 80.6 80.8 85.9 91.1 92.0 39.4 60.1 60.8
+
+ζ=50%, λ=5 73.1 80.6 80.8 87.7 94.0 94.8 35.4 56.4 61.0
+
+FedProx
+
+Pre-trained
+
+Samples
+
+Malicious Clients (ζ)
+
+Attack Intensity (λ)
+
+IID - Global Testing Accuracy Non-IID - Local Testing Accuracy Non-IID – Global Testing Accuracy
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+50,000
+
+ζ=0%, λ=1 82.8 84.2 84.1 95.4 98.0 98.2 57.0 68.6 69.9
+
+ζ=10%, λ=1 81.5 82.4 82.9 95.4 97.5 98.2 49.8 62.1 63.7
+
+ζ=20%, λ=1 80.1 81.1 82.0 94.0 97.4 97.6 45.0 57.3 58.1
+
+ζ=50%, λ=1 73.5 78.0 78.7 87.6 90.3 91.5 40.8 56.7 57.7
+
+ζ=50%, λ=5 73.5 78.4 78.7 88.0 93.2 94.0 35.7 56.8 58.5
+
+100,000
+
+ζ=0%, λ=1 82.8 85.9 85.8 95.4 98.4 98.6 57.0 71.9 73.4
+
+ζ=10%, λ=1 81.5 84.4 84.8 95.4 98.0 98.3 49.8 64.4 67.3
+
+ζ=20%, λ=1 80.1 83.8 84.0 94.0 97.6 97.9 45.0 59.8 61.9
+
+ζ=50%, λ=1 73.5 80.5 80.6 87.6 90.9 92.3 40.8 59.9 60.7
+
+ζ=50%, λ=5 73.5 80.5 80.9 88.0 94.6 94.8 35.7 55.1 60.5
+
+We conducted experiments to evaluate the generalized performance of FedBaF by varying the
+
+quality of foundation models. Tables 3, 4, and 5 present the results for image classification tasks
+
+using Pre-ResNet and Vision Transformer models, as well as a next-word prediction task using a
+
+Transformer model.
+
+To assess the impact of foundation model quality, we varied the number of pre-trained samples
+
+used for each model and assessed each method’s performance under a varying number of malicious
+
+clients and attack intensity. Interestingly, larger sample sizes do not always lead to better results,
+
+as seen in Table 3, where excessive pre-training can negatively impact performance. This trend is
+
+27
+
+
+
+Table 4: Image classification test accuracy results for Vision Transformer using no foundation,
+weight initialization, and FedBaF methods (best of 3 trials).
+
+FedAvg
+
+Pre-trained
+
+Samples
+
+Malicious Clients (ζ)
+
+Attack Intensity (λ)
+
+IID - Global Testing Accuracy Non-IID - Local Testing Accuracy Non-IID – Global Testing Accuracy
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+2,500
+
+ζ=0%, λ=1 74.0 82.0 82.0 93.4 99.1 98.9 64.0 76.0 88.0
+
+ζ=10%, λ=1 72.0 78.0 80.0 94.9 96.7 96.8 62.0 72.0 82.0
+
+ζ=20%, λ=1 72.0 74.0 78.0 91.4 96.7 94.0 58.0 74.0 74.0
+
+ζ=50%, λ=1 72.0 70.0 74.0 90.3 91.4 92.0 60.0 64.0 66.0
+
+ζ=50%, λ=5 50.0 70.0 78.0 91.4 91.3 89.7 50.0 62.0 66.0
+
+5,000
+
+ζ=0%, λ=1 74.0 72.0 72.0 93.4 98.0 98.0 64.0 78.0 76.0
+
+ζ=10%, λ=1 72.0 72.0 74.0 94.9 94.3 93.9 62.0 74.0 76.0
+
+ζ=20%, λ=1 72.0 78.0 72.0 91.4 90.6 92.0 58.0 72.0 68.0
+
+ζ=50%, λ=1 72.0 68.0 68.0 90.3 92.3 90.0 60.0 64.0 68.0
+
+ζ=50%, λ=5 50.0 72.0 70.0 91.4 92.3 90.5 50.0 66.0 66.0
+
+FedProx
+
+Pre-trained
+
+Samples
+
+Malicious Clients (ζ)
+
+Attack Intensity (λ)
+
+IID - Global Testing Accuracy Non-IID - Local Testing Accuracy Non-IID – Global Testing Accuracy
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+2,500
+
+ζ=0%, λ=1 76.0 82.0 82.0 93.5 99.1 98.9 64.0 76.0 88.0
+
+ζ=10%, λ=1 76.0 78.0 80.0 95.0 96.7 96.8 64.0 72.0 82.0
+
+ζ=20%, λ=1 74.0 74.0 78.0 91.3 96.7 94.0 58.0 74.0 74.0
+
+ζ=50%, λ=1 62.0 70.0 74.0 89.2 91.4 92.0 56.0 64.0 66.0
+
+ζ=50%, λ=5 50.0 70.0 78.0 90.3 91.3 89.7 48.0 62.0 66.0
+
+5,000
+
+ζ=0%, λ=1 76.0 72.0 72.0 93.5 98.0 98.0 64.0 78.0 76.0
+
+ζ=10%, λ=1 76.0 72.0 74.0 95.0 94.3 93.9 64.0 74.0 76.0
+
+ζ=20%, λ=1 74.0 78.0 72.0 91.3 90.6 92.0 58.0 72.0 68.0
+
+ζ=50%, λ=1 62.0 68.0 68.0 89.2 92.3 90.0 56.0 64.0 68.0
+
+ζ=50%, λ=5 50.0 72.0 70.0 90.3 92.3 90.5 48.0 66.0 66.0
+
+Table 5: Next-word prediction perplexity results for Transformer models using no foundation,
+weight initialization, and FedBaF methods (best of 3 trials). Lower perplexity is better.
+
+FedAvg
+
+Pre-trained
+
+Samples
+
+Malicious Clients (ζ)
+
+Attack Intensity (λ)
+
+Global Testing Perplexity
+
+No
+
+Foundation
+
+Weight Initiali
+
+zation
+FedBaF
+
+640,000
+
+ζ=0%, λ=1 536.5 172.8 128.6
+
+ζ=10%, λ=1 549.4 191.8 137.8
+
+ζ=20%, λ=1 531.3 213.7 159.4
+
+ζ=50%, λ=1 501.6 330.6 298.4
+
+ζ=50%, λ=5 680.4 311.7 275.1
+
+1,280,000
+
+ζ=0%, λ=1 536.5 202.6 183.3
+
+ζ=10%, λ=1 549.4 227.3 201.4
+
+ζ=20%, λ=1 531.3 258.3 224.2
+
+ζ=50%, λ=1 501.6 371.9 337.3
+
+ζ=50%, λ=5 680.4 343.9 322.8
+
+further evidenced in Tables 4, 5. The reason behind this is likely due to overfitting or reduced adapt-
+
+ability to new tasks. Despite these variations, FedBaF consistently outperforms models without
+
+foundation models and delivers similar testing performance to weight initialization.
+
+Training curves for selected cases can be found in Section D.
+
+C.2 Using the Official Pre-Trained Foundation Model
+
+We also evaluated the performance of FedBaF using the official pre-trained foundation model that
+
+was not developed by us. Specifically, we used ImageNet pre-trained weights for the Vision Trans-
+
+28
+
+
+
+Table 6: Image classification test accuracy results for Vision Transformer using official pre-trained
+foundation model weights from PyTorch. Comparisons are made between no foundation model,
+weight initialization, and FedBaF methods (best of 3 trials).
+
+FedAvg
+
+Pre-trained
+
+Samples
+
+Malicious Clients (ζ)
+
+Attack Intensity (λ)
+
+IID - Global Testing Accuracy Non-IID - Local Testing Accuracy Non-IID – Global Testing Accuracy
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+1,281,167
+
+ζ=0%, λ=1 47.9 81.5 81.3 84.2 96.9 96.0 41.3 70.8 71.5
+
+ζ=10%, λ=1 47.6 81.2 80.5 85.5 96.3 96.6 38.6 67.0 68.7
+
+ζ=20%, λ=1 45.6 80.3 80.1 85.0 94.9 94.1 36.3 63.7 65.4
+
+ζ=50%, λ=1 42.3 77.2 76.4 73.7 83.3 80.4 33.7 49.8 51.4
+
+ζ=50%, λ=5 37.8 74.3 72.7 74.7 85.6 82.4 28.7 40.4 50.4
+
+FedProx
+
+Pre-trained
+
+Samples
+
+Malicious Clients (ζ)
+
+Attack Intensity (λ)
+
+IID - Global Testing Accuracy Non-IID - Local Testing Accuracy Non-IID – Global Testing Accuracy
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight
+
+Initialization
+FedBaF
+
+1,281,167
+
+ζ=0%, λ=1 47.4 80.9 80.5 78.3 89.0 87.3 41.2 68.7 71.2
+
+ζ=10%, λ=1 46.7 80.4 80.3 75.9 85.5 83.1 37.7 61.0 62.2
+
+ζ=20%, λ=1 45.1 79.4 79.7 73.1 81.1 79.2 35.4 59.0 59.7
+
+ζ=50%, λ=1 41.7 76.7 75.9 62.5 64.9 64.9 32.8 48.8 49.2
+
+ζ=50%, λ=5 36.8 73.5 69.8 63.9 66.6 67.4 28.5 37.3 46.5
+
+former model, obtained from PyTorch’s official model repository. As shown in Table 6, FedBaF
+
+outperforms scenarios without foundation models and delivers similar performance to weight initial-
+
+ization using pre-trained weights. These results demonstrate that FedBaF can effectively integrate
+
+widely adopted pre-trained models.
+
+29
+
+
+
+C.3 Computational Complexity
+
+Table 7: Pre-ResNet and Vision Transformer computational complexities using no foundation
+model, weight initialization, and FedBaF methods. Note: T represents trillion.
+
+Pre-trained 
+
+Samples
+
+IID Non-IID
+
+No
+
+Foundation
+
+Weight 
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight 
+
+Initialization
+FedBaF
+
+FedAvg
+50,000 1.51 T 0.20 T 0.18 T 2.63 T 0.26 T 0.27 T
+
+100,000 1.51 T 0.11 T 0.13 T 2.63 T 0.21 T 0.20 T
+
+FedProx
+50,000 1.52 T 0.21 T 0.18 T 2.64 T 0.26 T 0.27 T
+
+100,000 1.52 T 0.11 T 0.13 T 2.64 T 0.21 T 0.20 T
+
+a) Pre-ResNet 
+
+b) Vision Tranformer
+
+Pre-trained 
+
+Samples
+
+IID Non-IID
+
+No
+
+Foundation
+
+Weight 
+
+Initialization
+FedBaF
+
+No
+
+Foundation
+
+Weight 
+
+Initialization
+FedBaF
+
+FedAvg
+2,500 7.34 T 0.20 T 0.23 T 8.08 T 0.20 T 0.49 T
+
+5,000 7.34 T 0.26 T 0.20 T 8.08 T 0.14 T 0.26 T
+
+FedProx
+2,500 6.66 T 0.20 T 0.23 T 8.91 T 0.20 T 0.49 T
+
+5,000 6.66 T 0.26 T 0.20 T 8.91 T 0.14 T 0.26 T
+
+FedBaF demonstrates remarkable efficiency in terms of computational complexity, requiring
+
+significantly fewer computations than scenarios without foundation models and performing similarly
+
+to weight initialization methods.
+
+To demonstrate that FedBaF’s computational demands are minimal, even when integrating the
+
+foundation model in every training round, we assess its computational complexity. Table 7 presents
+
+the computational complexities, measured in TMAC (Total Multiply-Accumulate Operations) from
+
+Section B, for six non-adversarial scenarios in both IID and non-IID settings. To calculate these
+
+complexities, we consider the number of training rounds required to achieve specific global testing
+
+accuracies: 75% for IID and 50% for non-IID scenarios in Pre-ResNet cases. For Vision Transformer
+
+cases, we set the thresholds to 60% IID accuracy and 60% non-IID accuracy.
+
+Compared to the no weight initialization cases, FedBaF requires significantly fewer com-
+
+putations across both IID and non-IID scenarios. Specifically, for Pre-ResNet IID and non-IID
+
+cases, computations are reduced by 88.1-91.4% and 89.7-92.4% for FedAvg, and by 88.2-91.4% and
+
+89.8-92.4% for FedProx, respectively. Similarly, for Vision Transformer, IID and non-IID scenarios
+
+see a reduction of 96.9-97.3% and 93.9-96.8% for FedAvg, and 96.5-97.0% and 94.5-97.1% for Fed-
+
+Prox in computations. Therefore, these findings indicate that FedBaF’s computational demands
+
+are relatively minimal despite the foundation model being integrated into every training round.
+
+These findings clearly indicate that FedBaF’s computational demands are minimal, even
+
+when integrating the foundation model into every training round, making it a highly efficient
+
+30
+
+
+
+solution in both IID and non-IID environments.
+
+31
+
+
+
+D Training curves
+
+In this section, we present the evolution of model accuracy over epochs for the experiments de-
+
+scribed in Section C, as shown in Figure 6. The experiments involve both Pre-ResNet and Vision
+
+Transformer models, focusing on two setups: 1) Pre-ResNet, with foundation models pre-trained
+
+using TinyImageNet-200 (50,000 pre-trained samples), and 2) Vision Transformer, with founda-
+
+tion models pre-trained using the Weather Image dataset (2,500 pre-trained samples). We present
+
+results for both IID and non-IID settings, using FedAvg and FedProx as the aggregation methods.
+
+These training curves illustrate the progression of model accuracy throughout the training pro-
+
+cess, comparing the behaviors of models using weight initialization and FedBaF. The curves demon-
+
+strate that FedBaF performs similarly to traditional weight initialization methods and achieves
+
+higher accuracies than when no foundation model is used.
+
+32
+
+
+
+FedAvg (IID)
+
+FedAvg (Non-IID)
+
+FedProx (IID)
+
+FedProx (Non-IID)
+
+a) Pre-ResNet (From TinyImageNet-200; 50,000 pre-trained samples) 
+
+b) Vision Transformer (From Weather Image; 2,500 pre-trained samples)
+
+FedAvg (IID)
+
+FedAvg (Non-IID)
+
+FedProx (IID)
+
+FedProx (Non-IID)
+
+Figure 6: This figure shows the evolution of model accuracy over training epochs for Pre-ResNets
+and Vision Transformers under IID and Non-IID scenarios. It compares the performance using no
+foundation model, weight initialization, and FedBaF with FedAvg and FedProx.
+
+33
+
+
+
+E Convergence Analysis
+
+This section provides a convergence analysis for the FedBaF algorithm under non-convex settings
+
+using Stochastic Gradient Descent (SGD). The study demonstrates how integrating a foundation
+
+model during aggregation can improve convergence rates, even in non-IID scenarios.
+
+E.1 Problem Setup
+
+Consider the global objective function in federated learning, which is defined as:
+
+F (w) =
+1∑m
+
+k=1 nk
+
+m∑
+k=1
+
+nkfDk
+(w), (3)
+
+where m is the number of clients, fDk
+(w) represents the local objective function on client k, nk is
+
+the number of data samples at client k, w ∈ Rd are the model weights, F (w) is the global objective
+
+function. To simplify our analysis, we assume all clients participate in every global round.
+
+We define w
+(t,ℓ)
+k as the model weights of client k at global round t and local update step ℓ.
+
+Therefore, before the first local update step in each global round, each client’s model weights wt
+k
+
+are equal to the global model weights wt and
+
+w
+(t,0)
+k = wt
+
+k = wt. (4)
+
+E.1.1 Assumptions
+
+We make the following standard assumptions to facilitate the convergence analysis:
+
+L-Smoothness: Each local objective function fDk
+(w) is L-smooth with respect to w, meaning:
+
+fDk
+(v) ≤ fDk
+
+(w) +∇fDk
+(w)⊤(v −w) +
+
+L
+
+2
+∥v −w∥2, ∀w,v ∈ Rd. (5)
+
+and
+
+∥∇fDk
+(v)−∇fDk
+
+(w)∥ ≤ L∥v −w∥, ∀w,v ∈ Rd. (6)
+
+34
+
+
+
+Unbiased Mini-Batch Gradients: The stochastic gradients computed over mini-batches during
+
+local updates are unbiased estimates of the true gradients.
+
+E [gDk
+(w; b)] = ∇fDk
+
+(w) ∀w ∈ Rd. (7)
+
+Bounded Gradient Norm: The gradients of the local objective functions are bounded by a
+
+constant β. Specifically,
+
+∥∇fDk
+(w)∥ ≤ β ∀w ∈ Rd. (8)
+
+Bounded Gradient Noise:
+
+E
+[
+∥gDk
+
+(w
+(t,ℓ)
+k ; bk,ℓ)∥2
+
+]
+≤ G2 +B2∥∇F (wt)∥2 (9)
+
+where G2 and B2 are constants that bound the dissimilarity, bk,ℓ denotes the j-th mini-batch on
+
+client k, and ℓ indexes the local update steps during global round t.
+
+E.2 FedBaF Aggregation Step with Multiple Local Updates
+
+The FedBaF algorithm operates in global rounds, where each global round t includes multiple local
+
+iterations denoted by ℓ. Each client performs multiple local updates in each global round.
+
+The global model is updated at round t using the rule:
+
+wt+1 =
+1
+
+1 + αtτt
+
+(
+w′
+t + αtτtwpre
+
+)
+, (10)
+
+where w′
+t is the aggregated model from the client updates, wpre is the foundation model’s weights,
+
+αt is a scaling factor, and τt represents the correction factor based on the foundation model.
+
+Each client k performs multiple local SGD updates over local iterations ℓ = 0, 1, . . . ,Λk − 1,
+
+where Λk is the number of local updates for each client k. For each local update, the local model
+
+is updated as:
+
+w
+(t,ℓ+1)
+k = w
+
+(t,ℓ)
+k − ηgDk
+
+(w
+(t,ℓ)
+k ; bk,ℓ), (11)
+
+where gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ) is the stochastic gradient computed on the mini-batch bk,ℓ at local iteration
+
+35
+
+
+
+ℓ.
+
+At the end of the local updates, each client sends the model w
+(t,Λk)
+k to the server, where the
+
+global model w′
+t is computed as the weighted average of the client updates:
+
+w′
+t = wt − η
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ), (12)
+
+where pk =
+nk∑m
+
+k=1 nk
+is the weight of client k.
+
+Substituting this into the FedBaF update rule:
+
+wt+1 =
+1
+
+1 + αtτt
+
+(
+wt + αtτtwpre − η
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)
+
+)
+(13)
+
+For small values of αtτt ≪ 1, we use the fact that:
+
+1
+
+1 + αtτt
+=
+
+∞∑
+i=0
+
+(−αtτt)i
+
+= 1− αtτt +
+∞∑
+i=2
+
+(−αtτt)i
+
+≈ 1− αtτt
+
+(14)
+
+which simplifies the update rule to:
+
+wt+1 ≈ wt − η
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)
+
+− αtτt
+
+([
+wt − η
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)
+
+]
+− (1− αtτt)wpre
+
+)
+.
+
+(15)
+
+The update rule can now be interpreted as multiple local gradient descent steps combined with
+
+a bias correction. Here, we define the correction term χt as follows:
+
+χt = αtτt
+
+([
+wt − η
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)
+
+]
+− (1− αtτt)wpre
+
+)
+. (16)
+
+χt acts as a correction that adjusts the direction of the gradient descent to leverage the foundation
+
+36
+
+
+
+model’s knowledge. The update rule becomes:
+
+wt+1 ≈ wt − η
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)− χt. (17)
+
+E.3 Decrease in Objective Function
+
+Using the smoothness property of F (w):
+
+F (wt+1) ≤ F (wt) +∇F (wt)
+⊤(wt+1 −wt) +
+
+L
+
+2
+∥wt+1 −wt∥2. (18)
+
+We substitute the update rule:
+
+wt+1 −wt ≈ −η
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)− χt. (19)
+
+Thus:
+
+F (wt+1) ⪅F (wt)− η∇F (wt)
+⊤
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)−∇F (wt)
+
+⊤χt
+
++
+L
+
+2
+∥η
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)− χt∥2.
+
+(20)
+
+Given the update rule, the change in the objective function can be bounded using the triangle
+
+inequality:
+
+F (wt+1)− F (wt) ⪅− η∇F (wt)
+⊤
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)−∇F (wt)
+
+⊤χt
+
++ Lη2∥
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)∥2 + L∥χt∥2
+
+(21)
+
+E.3.1 Taking Expectations
+
+We now take expectations of both sides of (21), based on the unbiasedness of mini-batch gradients
+
+and the assumptions about bounded gradient norms and smoothness.
+
+We now compute the expectation of the change in the objective function:
+
+37
+
+
+
+E
+
+[
+∇F (wt)
+
+⊤
+
+(
+−η
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)
+
+)]
+
+= ∇F (wt)
+⊤
+
+(
+−η(
+
+m∑
+k=1
+
+pkΛk)∇F (wt) + η(
+m∑
+k=1
+
+pkΛk)∇F (wt)− η
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+E
+[
+gDk
+
+(w
+(t,ℓ)
+k ; bk,ℓ)
+
+])
+
+= −η(
+m∑
+k=1
+
+pkΛk)∥∇F (wt)∥2 +∇F (wt)
+⊤
+
+(
+η(
+
+m∑
+k=1
+
+pkΛk)
+
+m∑
+k=1
+
+pk∇fDk
+(wt)− η
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+∇fDk
+(w
+
+(t,ℓ)
+k )
+
+)
+.
+
+(22)
+
+Next, we simplify the remaining term:
+
+= −η(
+m∑
+k=1
+
+pkΛk)∥∇F (wt)∥2 + η
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+∇F (wt)
+⊤
+(∑m
+
+k=1 pkΛk
+Λk
+
+∇fDk
+(wt)−∇fDk
+
+(w
+(t,ℓ)
+k )
+
+)
+
+≤ −η(
+m∑
+k=1
+
+pkΛk)∥∇F (wt)∥2 +
+η
+
+2
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+[
+∥∇F (wt)∥2 + ∥
+
+∑m
+k=1 pkΛk
+Λk
+
+∇fDk
+(wt)−∇fDk
+
+(w
+(t,ℓ)
+k )∥2
+
+]
+.
+
+(23)
+
+Finally, using the fact that the gradient is bounded, we get:
+
+≤ −
+
+(
+η
+
+2
+
+m∑
+k=1
+
+pkΛk
+
+)
+∥∇F (wt)∥2 +
+
+η
+
+2
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+∥
+∑m
+
+k=1 pkΛk
+Λk
+
+∇fDk
+(wt)−∇fDk
+
+(w
+(t,ℓ)
+k )∥2
+
+≤ −
+
+(
+η
+
+2
+
+m∑
+k=1
+
+pkΛk
+
+)
+∥∇F (wt)∥2 +
+
+η
+
+2
+
+m∑
+k=1
+
+2pk
+
+Λk−1∑
+ℓ=0
+
+[
+∥
+∑m
+
+k=1 pkΛk
+Λk
+
+∇fDk
+(wt)∥2 + ∥∇fDk
+
+(w
+(t,ℓ)
+k )∥2
+
+]
+
+≤ −
+
+(
+η
+
+2
+
+m∑
+k=1
+
+pkΛk
+
+)
+∥∇F (wt)∥2 + ηβ2
+
+m∑
+k=1
+
+pk
+
+(
+(
+∑m
+
+k=1 pkΛk)
+2
+
+Λk
++ Λk
+
+)
+.
+
+(24)
+
+This provides a bound on the expected decrease in the global objective function.
+
+Similarly,
+
+E
+
+[
+Lη2∥
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)∥2
+
+]
+
+≤ Lmη2
+m∑
+k=1
+
+E
+
+[
+∥pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)∥2
+
+]
+
+≤ Lmη2
+m∑
+k=1
+
+p2kΛk
+
+Λk−1∑
+ℓ=0
+
+E
+[
+∥gDk
+
+(w
+(t,ℓ)
+k ; bk,ℓ)∥2
+
+]
+≤ Lmη2
+
+m∑
+k=1
+
+p2kΛ
+2
+k(G
+
+2 +B2∥∇F (wt)∥2)
+
+(25)
+
+38
+
+
+
+Plugging these bounds into (21) gives
+
+E [F (wt+1)− F (wt)] ⪅ −η∇F (wt)
+⊤
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)−∇F (wt)
+
+⊤E [χt]
+
++ Lη2∥
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)∥2 + LE
+
+[
+∥χt∥2
+
+]
+≤ −
+
+(
+η
+
+2
+
+m∑
+k=1
+
+pkΛk
+
+)
+∥∇F (wt)∥2 + ηβ2
+
+m∑
+k=1
+
+pk
+
+(
+(
+∑m
+
+k=1 pkΛk)
+2
+
+Λk
++ Λk
+
+)
+−∇F (wt)
+
+⊤E [χt]
+
++ Lmη2
+m∑
+k=1
+
+p2kΛ
+2
+k(G
+
+2 +B2∥∇F (wt)∥2) + LE
+[
+∥χt∥2
+
+]
+≤
+
+(
+−η
+2
+
+m∑
+k=1
+
+pkΛk +B2Lmη2
+m∑
+k=1
+
+p2kΛ
+2
+k
+
+)
+∥∇F (wt)∥2 + ηβ2
+
+m∑
+k=1
+
+pk
+
+(
+(
+∑m
+
+k=1 pkΛk)
+2
+
+Λk
++ Λk
+
+)
+
+−∇F (wt)
+⊤E [χt] + Lmη2
+
+m∑
+k=1
+
+p2kΛ
+2
+kG
+
+2 + LE
+[
+∥χt∥2
+
+]
+
+(26)
+
+E.4 Summing Over Iterations
+
+To establish a convergence result, we sum this inequality over T iterations:
+
+T∑
+t=1
+
+F (wt+1) ≤
+T∑
+t=1
+
+F (wt) +
+
+(
+−η
+2
+
+m∑
+k=1
+
+pkΛk +B2Lmη2
+m∑
+k=1
+
+p2kΛ
+2
+k
+
+)
+T∑
+t=1
+
+∥∇F (wt)∥2
+
++ ηβ2T
+
+m∑
+k=1
+
+pk
+
+(
+(
+∑m
+
+k=1 pkΛk)
+2
+
+Λk
++ Λk
+
+)
+−
+
+T∑
+t=1
+
+∇F (wt)
+⊤E [χt]
+
++ Lmη2T
+m∑
+k=1
+
+p2kΛ
+2
+kG
+
+2 + L
+T∑
+t=1
+
+E
+[
+∥χt∥2
+
+]
+(27)
+
+As long as η <
+∑m
+
+k=1 pkΛk
+
+2B2Lm
+∑m
+
+k=1 p
+2
+kΛ
+
+2
+k
+, the term 1
+
+2
+
+∑m
+k=1 pkΛk−B2Lmη
+
+∑m
+k=1 p
+
+2
+kΛ
+
+2
+k is positive. There-
+
+fore, rearranging and dividing by T gives:
+
+1
+
+T
+
+T∑
+t=1
+
+E[∥∇F (wt)∥2] ≤
+F (w1)− F (wT+1)
+
+T (12
+∑m
+
+k=1 pkΛk −B2Lmη
+∑m
+
+k=1 p
+2
+kΛ
+
+2
+k)
+
++
+ηβ2
+
+∑m
+k=1 pk
+
+(
+(
+∑m
+
+k=1 pkΛk)
+2
+
+Λk
++ Λk
+
+)
++ Lmη2
+
+∑m
+k=1 p
+
+2
+kΛ
+
+2
+kG
+
+2
+
+1
+2
+
+∑m
+k=1 pkΛk −B2Lmη
+
+∑m
+k=1 p
+
+2
+kΛ
+
+2
+k
+
++
+L
+∑T
+
+t=1 E
+[
+∥χt∥2
+
+]
+−
+∑T
+
+t=1∇F (wt)
+⊤E [χt]
+
+T (12
+∑m
+
+k=1 pkΛk −B2Lmη
+∑m
+
+k=1 p
+2
+kΛ
+
+2
+k)
+
+(28)
+
+39
+
+
+
+If the sign of
+
+LE[∥χt∥2]−∇F (wt)
+⊤E[χt]
+
+is negative, we obtain a tighter bound, which implies that the correction terms positively influence
+
+convergence.
+
+We know that:
+
+χt = αtτt
+
+([
+wt − η
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+gDk
+(w
+
+(t,ℓ)
+k ; bk,ℓ)
+
+]
+− (1− αtτt)wpre
+
+)
+.
+
+This means:
+
+E
+[
+∥χt∥2
+
+]
+= α2
+
+t τ
+2
+t
+
+∥∥∥∥∥
+[
+wt − η
+
+m∑
+k=1
+
+pk
+
+Λk−1∑
+ℓ=0
+
+∇fDk
+(w
+
+(t,ℓ)
+k )
+
+]
+− (1− αtτt)wpre
+
+∥∥∥∥∥
+2
+
+.
+
+Given that αtτt is small enough at a sufficiently large global round t, the higher-order terms with
+
+α2
+t τ
+
+2
+t become negligible. Therefore, for large t, [∥χt∥2] ≈ 0. Next, the direction of the correction
+
+χt and the direction of the gradient of the global objective ∇F (wt) agreeing implies that the inner
+
+product ∇F (wt)
+⊤E [χt] is positive.
+
+We conclude that:
+
+LE
+[
+∥χt∥2
+
+]
+< ∇F (wt)
+
+⊤E[χt].
+
+This shows that the variance of the correction term χt is significantly smaller than its impact
+
+on the inner product, leading to a tighter convergence bound, especially when αtτt is small but
+
+positive.
+
+E.5 Influence of the Correction Term
+
+The correction term χt, derived from the foundation model, plays a significant role in the conver-
+
+gence behavior. The influence of χt ensures that the gradient descent step is adjusted based on
+
+the foundation model’s knowledge. By controlling the size of αtτt, the foundation model can guide
+
+the global model towards better solutions, especially in non-IID scenarios. The correction term
+
+provides additional stability and enhances convergence, particularly when the local models exhibit
+
+40
+
+
+
+significant heterogeneity.
+
+41
+
+
+
+F Proofs of Propositions
+
+F.1 Proof of Proposition 1
+
+Proposition 1. Let w∗ be a (bounded) local minimum of the global objective function in (1).
+
+Consider an FL algorithm that converges to w∗ and let w′
+t be its global model in each training
+
+round t. Suppose we run the same algorithm but using FedBaF for the aggregation, and let wt be
+
+the FedBaF global model at round t. Let αt satisfy
+
+αt <
+2∥w′
+
+t+1 −w∗∥2
+
+(∥wpre −w∗∥2 − ∥w′
+t+1 −w∗∥2)τt
+
+(2)
+
+for all t where ∥w′
+t+1 −w∗∥2 < ∥wpre −w∗∥2. Then ∀t ∥wt −w∗∥ < ∥w′
+
+t −w∗∥.
+
+This means that, at any given round t, FedBaF’s model weights are closer to w∗.
+
+Proof. We present a convergence analysis of our FL framework that incorporates foundation models
+
+in the aggregation phase according to Alg. 1 Lines 8-10. By comparing the square distance between
+
+wt+1 and w∗ to the square distance between w′
+t+1 and w∗, we derive conditions under which our
+
+method converges to w∗ faster than FedAvg. Noting that ∀t αt, τt ≥ 0,
+
+∥wt+1 −w∗∥2 = ∥ 1
+
+1 + αtτt
+(w′
+
+t+1 + αtτtwpre)−w∗∥2
+
+=
+1
+
+(1 + αtτt)2
+∥(w′
+
+t+1 −w∗) + αtτt(wpre −w∗)∥2
+
+≤
+∥w′
+
+t+1 −w∗∥2 + α2
+t τ
+
+2
+t ∥wpre −w∗∥2
+
+1 + 2αtτt + α2
+t τ
+
+2
+t
+
+(29)
+
+For notational convenience, we define βt := ∥w′
+t+1 − w∗∥ and γ := ∥wpre − w∗∥. FedBaF is
+
+better than FedAvg when the right side is less than β2t . So, we upper bound the right side by β2t
+
+and find values of αt that satisfy the bound.
+
+β2t + α2
+t τ
+
+2
+t γ
+
+2
+
+1 + 2αtτt + α2
+t τ
+
+2
+t
+
+< β2t
+
+β2t + α2
+t τ
+
+2
+t γ
+
+2 < β2t + 2αtτtβ
+2
+t + α2
+
+t τ
+2
+t β
+
+2
+t
+
+α2
+t τ
+
+2
+t (γ
+
+2 − β2t )− 2αtτtβ
+2
+t < 0
+
+42
+
+
+
+Note that αt is sampled from the uniform distribution ψ
+τ0
+U(1, 2). For the above inequality to be
+
+satisfied for a given t, there are three cases:
+
+1. βt > γ: This case occurs when t is small and w∗ is closer to wpre than w∗ is to the FedBaF
+
+global model. In this case, we require
+
+αt >
+2β2t
+
+(γ2 − β2t )τt
+
+αt always satisfies this inequality since the RHS is negative and αt > 0 by definition.
+
+2. βt = γ: This means that we require αt > 0, which is always true by definition.
+
+3. βt < γ: This case may occur when t is large and w∗ is closer to the FedBaF global model
+
+than w∗ is to wpre. In this case, we get a meaningful bound for αt:
+
+αt <
+2β2t
+
+(γ2 − β2t )τt
+
+When ∀t αt satisfies the above conditions, the proposition holds.
+
+43
+
+
+
+F.2 Proof of Proposition 2
+
+Proposition 2. Let w∗ be a (bounded) local minimum of the global objective function in (1).
+
+Consider an FL algorithm that converges to w∗ and let w′
+t be its global model. Consider FedBaF
+
+based on the same FL algorithm (with appropriately modified client updates and Lines 8-10 in
+
+Alg. 1) and let wt be the FedBaF global model. FedBaF’s global model error has an upper bound of
+
+∥wt −w∗
+t ∥ ≤
+
+δt+αtτtγ
+1+αtτt
+
+< δt.
+
+Proof.
+
+∥wt −w∗∥ =
+∥∥∥∥ 1
+
+1 + αtτt
+(w′
+
+t + αtτtwpre)−w∗
+∥∥∥∥
+
+=
+∥(w′
+
+t −w∗) + αtτt(wpre −w∗)∥
+1 + αtτt
+
+≤ ∥w
+′
+t −w∗∥+ αtτt∥wpre −w∗∥
+
+1 + αtτt
+
+=
+
+∥∥∑
+k∈St
+
+nk
+n (wk
+
+t −w∗)
+∥∥+ αtτt∥wpre −w∗∥
+
+1 + αtτt
+
+≤
+∑
+
+k∈St
+
+nk
+n ∥w
+
+k
+t −w∗∥+ αtτt∥wpre −w∗∥
+
+1 + αtτt
+
+≤ δt + αtτtγ
+
+1 + αtτt
+
+where we set γ = ∥wpre −w∗∥.
+
+Since non-IID data can cause significant variance in local updates, we compare the derived
+
+bound to FedAvg, where the bound on the distance between wt and w∗ is δt. By assumption,
+
+γ ≤ δt for earlier rounds (small t). We get δt+αtτtγ
+1+αtτt
+
+≤ δt, which is equivalent to
+
+δt + αtτtγ ≤ δt + αtτtδt = δt(1 + αtτt)
+
+Therefore,
+
+∥wt −w∗∥ ≤ δt + αtτtγ
+
+1 + αtτt
+
+Since δt+αtτtγ
+1+αtτt
+
+≤ δt, FedBaF has a tighter upper bound on ∥wt −w∗∥ than FedAvg. This demon-
+
+strates the advantage of using a foundation model in non-IID settings.
+
+44
+
+
+
+G Security Analysis in the Presence of Adversarial Attacks
+
+In this section, we discuss the potential for extracting a foundation model in FedBaF and demon-
+
+strate FedBaF’s robustness against backdoor attacks. These attacks pose unique security challenges
+
+to FL systems, involving malicious alterations within model updates to degrade system performance
+
+or embed hidden vulnerabilities. We will analyze how FedBaF mitigates these threats and ensures
+
+integrity and security.
+
+G.1 Possibility of Extracting a Foundation Model
+
+As discussed in Section 3, using a randomized αt prevents the extraction of the foundation model’s
+
+weights. However, the aggregated global models might still exhibit components of the foundation
+
+model by following a similar weight distribution. To investigate this, we analyze the distance
+
+between the global model and the foundation model over the first 200 aggregation rounds.
+
+Let wt+1 and wpre represent the weights of the global model and the foundation model, respec-
+
+tively. For each weight tensor wi
+t+1 and wi
+
+pre with matching shapes, we calculate the normalized
+
+distance for each element and then average these distances. For each element j in the weight tensor
+
+wi
+t+1 and wi
+
+pre:
+
+distij =
+|wit+1,j − wipre,j |
+|wit+1,j |
+
+where wit+1,j is the j-th element of the i-th weight tensor of the global model; wipre,j is the j-th
+
+element of the i-th weight tensor of the foundation model; and distij is the normalized distance for
+
+the j-th element of the i-th weight tensor.
+
+We concatenate all element-wise distances distij across all weight tensors and then compute the
+
+mean of these distances:
+
+Dist =
+1
+
+Nparam
+
+∑
+i=1
+
+∑
+j=1
+
+distij
+
+where Nparam is the total number of elements across all matching weight tensors and Dist is the
+
+overall average normalized distance.
+
+In Figure 7, the curves show the distances, Dist, for each aggregation round. The minimum
+
+Dist across all cases was 1.27, indicating that the distance has a 127% scale of the magnitude of
+
+45
+
+
+
+a) Pre-ResNet
+
+     (100,000 Pre-trained Data Samples)
+
+b) Vision Transformer
+
+     (2,500 Pre-trained Data Samples)
+
+c) Transformer
+
+     (640,000 Pre-trained Data Samples)
+
+FedAvg
+
+FedProx
+
+FedAvg
+
+FedProx
+
+Figure 7: Distances (Dist) between the global model and the foundation model across aggregation
+rounds. The minimum Dist observed was 1.27, indicating significant differences in scale between
+the foundation model’s weights and the aggregated global model’s weights.
+
+the weights of the aggregated global model. This means the foundation model’s weights differ in
+
+scale from the aggregated weights. To analyze the effect of distance intensity, we added Gaussian
+
+random noise based on the magnitude of each foundation model’s weights to the foundation model’s
+
+weights.
+
+a) Pre-ResNet
+
+     (100,000 Pre-trained Data Samples)
+
+b) Vision Transformer
+
+     (2,500 Pre-trained Data Samples)
+
+c) Transformer
+
+     (640,000 Pre-trained Data Samples)
+
+Figure 8: Testing accuracy according to the added noise. The x-axis error rate is calculated by
+the magnitude of the added Gaussian noise divided by the magnitude of the foundation model’s
+weights.
+
+Figure 8 shows the testing accuracy as a function of the added noise. The x-axis represents the
+
+error rate, calculated by dividing the magnitude of the added Gaussian noise by the magnitude of
+
+the foundation model’s weights. We used the best-performing foundation models from those with
+
+46
+
+
+
+varying pre-trained sample sizes, as described in Section C. When a 127% error rate is applied, the
+
+Pre-ResNet model shows almost 0% testing accuracy, the Vision Transformer shows 30% testing
+
+accuracy, and the Transformer model exhibits excessively high testing perplexity. This empirical
+
+evidence indicates that extracting the foundation model’s knowledge is impossible after training
+
+begins from the global model. The diverse updates during training in FedBaF significantly dis-
+
+rupt the alignment between the foundation model’s weights and the global model, preventing any
+
+meaningful extraction of the foundation model’s information.
+
+To this end, we examine the proximity of the global model, wt, to the foundation model and to
+
+the averaged local models, w′
+t, throughout the training process. We first determine the distances
+
+between w′
+t and wt and between wt and wpre:
+
+∥wt −w′
+t∥ =
+
+∥∥∥∥ 1
+
+1 + ατt
+(w′
+
+t + ατtwpre)−w′
+t
+
+∥∥∥∥
+=
+
+ατt
+1 + ατt
+
+∥w′
+t −wpre∥
+
+∥wt −wpre∥ =
+∥∥∥∥ 1
+
+1 + ατt
+w′
+t + ατtwpre −wpre
+
+∥∥∥∥
+=
+
+1
+
+1 + ατt
+∥w′
+
+t −wpre∥
+
+At the onset of training, both distances are equivalent since we make a strategic choice for the
+
+weight αtτ0 to be approximately 2. This simplifies the initial update rule for the global model such
+
+that the initial global model weights, w0, are an unweighted average of the client’s updated model
+
+weights w′
+0 and the foundation model weights wpre. As the training progresses, ατt typically decays
+
+to less than 1. We deduce for t > 0:
+
+ατt
+1 + ατt
+
+<
+1
+
+1 + ατt
+=⇒ ∥wt −w′
+
+t∥ < ∥wt −wpre∥
+
+As t → ∞, wt will drift away from wpre and towards w′
+t. Due to the intricate dissemination of
+
+learned insights across all model weights, and the complexities of high-dimensional weight spaces,
+
+it is difficult to reverse-engineer wpre from wt. Even a subset of weights does not provide enough
+
+information to predict the rest deterministically. The inherent complexity of the model weight
+
+(parameter) space is a natural defense mechanism in FedBaF.
+
+47
+
+
+
+G.2 Mitigating Backdoor Attacks
+
+Backdoor attacks in FL involve embedding a dormant malicious function in a local model. In-
+
+tegrating foundation models mitigates such attacks by diluting the impact of individual client
+
+updates. Specifically, we have the updates
+
+∆wt
+client = ClientUpdate(wt)
+
+wt+1 =
+1
+
+1 + αtτt
+(∆wt
+
+client + αtτtwpre)
+
+Here, ∆wt
+client is the update from client c at iteration t, and wpre is the foundation model weight.
+
+The factor τt controls the influence of the foundation model. This mathematical formulation show-
+
+cases the security benefits of our method. By incorporating the foundation model, the aggregation
+
+counterbalances the (malicious) client update ∆wt
+client. This approach thus enhances the system’s
+
+resilience to adversarial attacks by maintaining a consistent learning direction and reducing the
+
+impact of compromised updates.
+
+G.3 Experiments on Variations of τt
+
+𝑤
+𝑡+
+1
+
+′
+
+𝑤
+𝑡+
+1
+
+′
+−
+
+𝑤
+𝑡
+
+𝑤
+𝑡
+
+𝑤
+𝑡+
+1
+
+′
+
+𝑤
+𝑡+
+1
+
+′
+−
+
+𝑤
+𝑡
+
+𝑤
+𝑡
+
+𝑤
+𝑡+
+1
+
+′
+
+𝑤
+𝑡+
+1
+
+′
+−
+
+𝑤
+𝑡
+
+𝑤
+𝑡
+
+a) Pre-ResNet (FedAvg) b) Vision Transformer (FedProx) c) Transformer (FedAvg)
+
+Figure 9: Variations of ∥ w′
+t+1
+
+∥w′
+t+1∥
+− wt
+
+∥wt∥∥ (= τt
+√
+t+ 1) across training rounds.
+
+Figure 9 illustrates the non-adversarial IID and non-IID scenarios from Tables 3, 4, and 5. We
+
+observed that the numerator of τt (as referenced in Alg. 1 Line 9 ) consistently decreases towards 0,
+
+independent of the denominator (
+√
+t+ 1), after several rounds. This indicates that FedBaF benefits
+
+from the foundation model’s guidance but retains the ability to effectively and quickly adapt to
+
+new data.
+
+48
+
+
+	Introduction
+	Related Work
+	FedBaF Methodology
+	Theoretical Analysis of FedBaF
+	General Convergence Analysis
+	Effectiveness of FedBaF with Diverse Client Data 
+
+	Experimental Evaluations
+	Experimental Setup
+	Experimental Results
+	Testing Performance Enhancements
+	Robustness to Attacks
+
+
+	Conclusion
+	Experimental Setup
+	Formulas for Evaluating Computational Complexity
+	Additional Experimental Evaluations
+	Differentiating the Quality of Pre-Trained Foundation Models
+	Using the Official Pre-Trained Foundation Model
+	Computational Complexity
+
+	Training curves
+	Convergence Analysis
+	Problem Setup
+	Assumptions
+
+	FedBaF Aggregation Step with Multiple Local Updates
+	Decrease in Objective Function
+	Taking Expectations
+
+	Summing Over Iterations
+	Influence of the Correction Term
+
+	Proofs of Propositions
+	Proof of Proposition 1
+	Proof of Proposition 2
+
+	Security Analysis in the Presence of Adversarial Attacks
+	Possibility of Extracting a Foundation Model
+	Mitigating Backdoor Attacks
+	Experiments on Variations of .
+
+

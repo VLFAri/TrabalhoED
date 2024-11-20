@@ -1,0 +1,2706 @@
+
+Enhancing Feature-Specific Data Protection via
+
+Bayesian Coordinate Differential Privacy *
+
+Maryam Aliakbarpour † Syomantak Chaudhuri ‡ Thomas A. Courtade ‡
+
+Alireza Fallah ‡ Michael I. Jordan §
+
+October 23, 2024
+
+Abstract
+
+Local Differential Privacy (LDP) offers strong privacy guarantees without requiring users to
+trust external parties. However, LDP applies uniform protection to all data features, including
+less sensitive ones, which degrades performance of downstream tasks. To overcome this
+limitation, we propose a Bayesian framework, Bayesian Coordinate Differential Privacy (BCDP),
+that enables feature-specific privacy quantification. This more nuanced approach complements
+LDP by adjusting privacy protection according to the sensitivity of each feature, enabling
+improved performance of downstream tasks without compromising privacy. We characterize
+the properties of BCDP and articulate its connections with standard non-Bayesian privacy
+frameworks. We further apply our BCDP framework to the problems of private mean estimation
+and ordinary least-squares regression. The BCDP-based approach obtains improved accuracy
+compared to a purely LDP-based approach, without compromising on privacy.
+
+1 Introduction
+
+The rapid expansion of machine learning applications across various sectors has fueled an un-
+precedented demand for data collection. With the increase in data accumulation, user privacy
+concerns also intensify. Differential privacy (DP) has emerged as a prominent framework that
+enables algorithms to utilize data while preserving the privacy of individuals who provide it
+Warner [1965], Evfimievski et al. [2003], Dwork et al. [2006, 2014], Vadhan [2017], Desfontaines
+[2020]. A variant of DP, local differential privacy (LDP), suitable for distributed settings where
+users do not trust any central authority has been extensively studied [Warner, 1965, Evfimievski
+et al., 2003, Beimel et al., 2008, Kasiviswanathan et al., 2011, Chan et al., 2012]. In this framework,
+
+*The authors are listed in alphabetical order.
+†Department of Computer Science & Ken Kennedy Institute, Rice University
+‡Department of Electrical Engineering and Computer Sciences, University of California, Berkeley
+§Department of Electrical Engineering and Computer Sciences & Department of Statistics, University of California,
+
+Berkeley; INRIA, Paris
+
+1
+
+
+each user shares an obfuscated version of their datapoint, meaningful in aggregate to the central
+server yet concealing individual details. Leading companies, including Google [Erlingsson et al.,
+2014], Microsoft [Ding et al., 2017], and Apple [Differential Privacy Team, Apple, 2017, Thakurta
+et al., 2017], have employed this approach for data collection.
+
+In the LDP framework, a privacy parameter must be set—typically by the data collector—that
+determines the level of protection for user information. This decision is particularly challenging in
+high-dimensional settings, where user data includes multiple attributes such as name, date of birth,
+and social security number, each with differing levels of sensitivity. One common strategy is to
+allow the most sensitive data feature to dictate the level of privacy, providing the highest level of
+protection. Alternatively, separate private mechanisms can be applied to each feature according to
+its required privacy level. However, this approach fails when there is correlation between features.
+For instance, setting a lower level of privacy for a feature that is consistently aligned with a more
+sensitive one risks compromising the privacy of the sensitive feature.
+
+This complexity raises a compelling question: Can we tailor privacy protection to specific
+data features if the correlation among data coordinates is controlled, without defaulting to the
+privacy level of the most sensitive coordinate? In other words, can we leverage users’ lower
+sensitivity preferences for certain features to reduce the error in our inference algorithms, provided
+the correlation with sensitive coordinates is weak?
+
+Our contributions: Our main contribution is addressing the challenge of feature-specific data
+protection from a Bayesian perspective. We present a novel Bayesian privacy framework, which
+we refer to as Bayesian Coordinate Differential Privacy (BCDP). BCDP complements LDP and allows a
+tailored privacy demand per feature. In essence, BCDP ensures that the odds of inferring a specific
+feature (also referred to as a coordinate) remain nearly unchanged before and after observing the
+outcome of the private mechanism. The framework’s parameters control the extent to which the
+odds remain unchanged, enabling varying levels of privacy per feature. As part of developing this
+new framework, we explore its formal relationship with other related DP notions and examine
+standard DP properties, such as post-processing and composition.
+
+To demonstrate the efficacy of our framework, we study two fundamental problems in machine
+learning under a baseline level of LDP privacy, coupled with more stringent per-coordinate BCDP
+constraints. First, we address multivariate mean estimation. Our proposed algorithm satisfies BCDP
+constraints while outperforming a standard LDP algorithm, where the privacy level is determined
+by the most sensitive coordinate. Our experimental results confirm this advantage. Second, we
+present an algorithm for ordinary least squares regression under both LDP and BCDP constraints.
+
+A key technical component of our algorithm for these two problems is a mechanism that builds
+on any off-the-shelf LDP mechanism and can be applied to various problems. Our algorithm
+involves making parallel queries to the LDP mechanism with a series of carefully selected privacy
+parameters where the i-th query omits the i− 1 most sensitive coordinates. The outputs are then
+aggregated to produce the most accurate estimator for each coordinate.
+
+2
+
+
+
+Bayesian Feature-Specific Protection: We now give a high-level discussion of privacy in the
+Bayesian framework to motivate our approach. Formal definitions are in Section 2. Consider a set
+of users, each possessing a high-dimensional data point x with varying privacy protection needs
+across different features. For instance, x may contain genetic markers for diseases, and the i-th
+coordinate xi could reveal Alzheimer’s markers that the user wishes to keep strictly confidential.
+In a local privacy setting, users apply a locally private mechanism M to obtain obfuscated data
+M(x), for public aggregation and analysis. Our focus is on understanding what can be inferred
+about x, especially the sensitive feature xi, from the obfuscated data.
+
+Now, imagine an adversary placing a bet on a probabilistic event related to x. Without extra
+information, their chances of guessing correctly are based on prior knowledge of the population.
+However, access to M(x) could prove advantageous for inference. Privacy in the Bayesian model
+is measured by how much M(x) improves the adversary’s chances. In other words, the privacy
+parameter limits how much their odds can shift.
+
+The standard Bayesian interpretation of LDP ensures uniform privacy across all data features.
+In contrast, our framework BCDP enhances LDP by enabling feature-specific privacy controls.
+That is, BCDP restricts adversarial inference of events concerning individual coordinates. For
+example, BCDP ensures that the advantage an adversary gains from observing M(x) when betting
+on whether a person has the Alzheimer’s trait (i.e., xi = 1) is smaller than what would be achieved
+under a less stringent LDP constraint.
+
+We remark that BCDP does not replace LDP, since it lacks global data protection. Also, corre-
+lation plays a crucial role in BCDP’s effectiveness: if a sensitive feature is highly correlated with
+less sensitive features, increasing protection for the sensitive feature imposes stricter protection for
+other features as well. As the correlation between features increases, BCDP’s guarantees converge
+to the uniform guarantees of LDP.
+
+Related Work: Statistical inference with LDP guarantees has been extensively studied. For
+comprehensive surveys see Xiong et al. [2020], Yang et al. [2023]. Below, we discuss the results that
+are most relevant to our setup.
+
+Several papers consider the uneven protection of privacy across features. For instance, Ghazi
+et al. [2022] and Acharya et al. [2020] focus on settings where the privacy parameters vary across
+different neighboring datasets. Other models arise from altering the concept of neighboring
+datasets [Kifer and Machanavajjhala, 2014, He et al., 2014], or they emphasize indistinguishability
+guarantees within a redefined metric space for the datasets or data points Chatzikokolakis et al.
+[2013], Alvim et al. [2018], Imola et al. [2022], Andrés et al. [2013]. Another relevant notion for
+classification tasks is Label-DP which considers labels of training data as sensitive, but not the
+features themselves [Chaudhuri and Hsu, 2011, Beimel et al., 2013, Wang and Xu, 2019, Ghazi et al.,
+2021]. A recent generalization of Label-DP, proposed by Mahloujifar et al. [2023], is Feature-DP,
+which allows specific features of the data to be disclosed by the algorithm while ensuring the
+privacy of the remaining information. A line of work, e.g., Kifer and Machanavajjhala [2011],
+
+3
+
+
+
+Kenthapadi et al. [2013], studies attribute DP, which limits changes in the output distribution of the
+privacy mechanism when a single coordinate of the data is modified.
+
+A common shortcoming in the aforementioned approaches is that the heterogeneous privacy
+protection across features, without accounting for their correlations, can lead to unaddressed
+privacy leakage—an issue our framework is specifically designed to mitigate. Another key dis-
+tinction of our work is the integration of the BCDP framework with the LDP framework, enabling
+simultaneous protection at both the feature level and the global level.
+
+A Bayesian approach to Central-DP is considered in Triastcyn and Faltings [2020] where the
+notation of neighboring dataset are taken over pairs that are drawn from the same distribution.
+This is similar in spirit to our framework but we operate in the Local-DP regime so we work with a
+prior instead. Xiao and Devadas [2023] consider a Bayesian approach to privacy where the goal is
+to prevent an observer from being able to nearly guess the input to a mechanism under a given
+notion of distance and error probability. Another Bayesian interpretation of DP is presented in
+Kasiviswanathan and Smith [2014] and show that DP ensures that the posterior distribution after
+observing the output of a DP algorithm is close to the prior in Total-Variation distance. None of
+these results explicitly focus on varying privacy features across coordinates.
+
+Private mean estimation and private least-squares regression are well studied problems in
+literature in both central [Biswas et al., 2020, Karwa and Vadhan, 2017, Kifer et al., 2012, Vu and
+Slavkovic, 2009] and local [Asi et al., 2022, Feldman and Talwar, 2021, Zheng et al., 2017] DP
+regimes. We depart from these works as we consider a BCDP constraint in addition to an LDP
+constraint.
+
+Organization: We present a formal treatment of our framework in Section 2. Some key properties
+of the framework are presented in Section 3. We consider the problem of mean estimation in Section 4
+and ordinary least-squares regression in Section 5.
+
+2 Problem Formulation
+
+LetX denote the data domain represented as the Cartesian productX :=×d
+j=1Xj . One can consider
+
+this as a general decomposition where each of d canonical data coordinates can be categorical or a
+real value, or a combination of both, as the setting dictates. For a vector x ∈ X , we let xi denote
+the i-th coordinate, and x−i the vector with (d − 1) coordinates obtained by removing the i-th
+coordinate xi from x. A private mechanism M is a randomized algorithm that maps x to M(x) in
+an output space Y .
+
+Let (X ,FX ) and (Y,FY) be measurable spaces. Let each coordinate space Xi be equipped with
+σ-algebra FXi , and take FX equal to the product σ-algebra×d
+
+i=1FXi . A randomized mechanism
+M from X to Y can be represented by a Markov kernel µ : (X ,FX )→ (Y,FY) where for an input
+x ∈ X , the output M(x) is a Y-valued random variable with law µx(·).
+
+4
+
+
+
+Local differential privacy We first revisit the definition of Local Differential Privacy (LDP).
+
+Definition 1 (Local DP [Kasiviswanathan et al., 2011]). A mechanism M is ε-LDP if, for all R ∈ FY
+
+and all x,x′ ∈ X , we have:
+µx(R) ≤ eεµx′(R). (1)
+
+With the understanding that M(x) ∼ µx(·), Definition 1 can be rewritten in the more familiar
+form Pr{M(x) ∈ R} ≤ eεPr{M(x′) ∈ R} ∀x,x′ ∈ X , R ∈ FY .
+
+Next, we focus on a Bayesian interpretation of this setting. Suppose we have an underlying data
+distribution π. That is, we equip (X ,FX ) with the probability measure π which we call the prior.
+This induces a probability space (X × Y,FX ×FY , P ) where the measure P is characterized via
+
+P (S ×R) =
+
+∫
+S
+µx(R)dπ(x), S ∈ FX , R ∈ FY . (2)
+
+Note that the mechanism M defining µ is precisely represented on this space by the random variable
+M : (x, y) ∈ X × Y 7→ y. By a slight abuse of notation, we continue to denote the (randomized)
+output of the mechanism by M(x). We first define the sets on X which have positive probability
+under π
+
+F+
+X = {S ∈ FX |π(S) > 0}. (3)
+
+For S ∈ F+
+X and R ∈ FY , note that
+
+P{M(x) ∈ R|x ∈ S} = P (S ×R)
+
+π(S)
+. (4)
+
+Bayesian differential privacy: We now introduce a Bayesian formulation of the LDP definition
+which involves both the mechanism M and the prior π. This can be seen as the local version of
+the definitions proposed in earlier works, e.g., Kifer and Machanavajjhala [2014], Triastcyn and
+Faltings [2020].
+
+Definition 2 (Bayesian DP). The pair (π,M) is ε-BDP if for all R ∈ FY and all S, S′ ∈ F+
+X , we have:
+
+P{M(x) ∈ R|x ∈ S} ≤ eεP{M(x) ∈ R|x ∈ S′}. (5)
+
+We show in Proposition 1 that ε-LDP and ε-BDP can be viewed as equivalent, modulo some
+technicalities.
+
+Proposition 1. If M is ε-LDP then (π,M) is ε-BDP. Conversely, if (π,M) is ε-BDP, then (assuming Y is
+a Polish space) there exists a mechanism M ′ which is ε-LDP such that P{M(x) = M ′(x)} = 1.
+
+The reverse direction of the equivalence above relies on Y being a Polish space, which should
+capture all settings of practical interest. The proof can be found in Appendix A.1.
+
+5
+
+
+
+As discussed in Kifer and Machanavajjhala [2014], we can interpret the BDP definition in terms
+of odds ratios. The prior odds of two disjoint events S and S′ is given by π(S)/π(S′). Now, for a set
+R ∈ FY with positive measure, the posterior odds, after observing mechanism output M(x) ∈ R, is
+equal to
+
+P{x ∈ S|M(x) ∈ R}
+P{x ∈ S′|M(x) ∈ R}
+
+. (6)
+
+One can easily verify that the BDP definition implies that the ratio of posterior and prior odds, also
+known as the odds ratio, is in the interval [e−ε, eε]. In other words, the BDP definition limits how
+much the output of the mechanism changes the odds, which in turn limits our ability to distinguish
+whether the data x was in S or S′.
+
+Coordinate differential privacy: We wish to measure the privacy loss of each coordinate incurred
+by a mechanism M . Initially, one might hypothesize that by altering the definition of LDP to reflect
+changes in specific coordinates, we could achieve privacy protection for certain features of the
+user’s data. More precisely, consider the following definition of Coordinate DP (CDP)1 where c
+
+represents a vector of the desired levels of privacy for each coordinate.
+
+Definition 3 (Coordinate DP). Let c ∈ Rd
+≥0. A mechanism M is c-CDP if, for all R ∈ FY and all
+
+x,x′ ∈ X , we have the implication:
+
+x−i = x′
+−i ⇒ µx(R) ≤ eciµx′(R). (7)
+
+A special case of CDP, where all ci’s are equal, is referred to as attribute DP in the literature
+Kifer and Machanavajjhala [2011], Kenthapadi et al. [2013], Ghazi et al. [2022]. Additionally, CDP
+itself can be viewed as a special case of Partial DP, introduced in Ghazi et al. [2022].
+
+The drawback of this definition is that it does not account for potential correlation among the
+data coordinates and, therefore, does not provide the type of guarantee we hope for regarding
+sensitive parts of the data. In other words, in c-CDP, stating that the privacy level of coordinate i is
+ci could be misleading. For instance, having ci = 0 does not necessarily ensure that no information
+is leaked about xi, as the other (potentially less-well protected) coordinates x−i may be correlated
+with it.
+
+Our formulation: Bayesian coordinate differential privacy: In order to capture the correlation
+among the data coordinates, we adopt a Bayesian interpretation of differential privacy. As seen
+in Proposition 1, BDP and LDP are closely related and this serves as the main motivation for our
+definition.
+
+For i ∈ [d], define
+F+
+Xi
+
+= {Si ∈ FXi |π{xi ∈ Si} > 0}. (8)
+
+1The acronym CDP is not to be confused with Concentrated DP, which is not considered in this work.
+
+6
+
+
+
+For Si ∈ F+
+Xi
+
+, we have
+
+P{M(x) ∈ R|xi ∈ Si} =
+P ((Si ×X−i)×R)
+
+π(Si ×X−i)
+, (9)
+
+where X−i =×j∈[d],j ̸=iXj . Thus, similar to Definition 2, we have a natural version of privacy for
+each coordinate which we shall refer to as Bayesian Coordinate DP (BCDP).
+
+Definition 4 (Bayesian Coordinate DP). Let δ ∈ Rd
+≥0. A pair (π,M) is δ-BCDP if, for each i ∈ [d],
+
+and for all R ∈ FY , Si, S
+′
+i ∈ F
+
++
+Xi
+
+, we have:
+
+P{M(x) ∈ R|xi ∈ Si} ≤ eδiP{M(x) ∈ R|xi ∈ S′
+i}. (10)
+
+Unlike the Coordinate-DP definition, this definition accounts for potential correlation between
+coordinates through incorporation of the prior π.
+
+It is worth noting that, similar to the BDP definition, we can interpret the BCDP definition
+in terms of the odds ratio, with the difference that we consider the two events {xi ∈ Si} and
+{xi ∈ S′
+
+i}. In other words, having a small δi guarantees that the mechanism’s output does not
+provide much useful information for discriminating between the possibilities that the underlying
+data has coordinate xi in Si or S′
+
+i. This aligns with our goal of proposing a new formulation that
+characterizes how much information is revealed about each particular coordinate. We further
+discuss this interpretation in the next section.
+
+3 Properties of BCDP
+
+In this section, we discuss a number of properties following from the BCDP definition. Figure 1
+compiles some of the results from Section 2 and Section 3 on how the different notions of Local
+DP (LDP), Coordinate-DP (CDP), Bayesian DP (BDP), and Bayesian Coordinate-DP (BCDP) are
+interrelated.
+
+3.1 BCDP through the Lens of Hypothesis Testing
+
+In this subsection, we present an interpretation of what the privacy vector δ quantifies in δ-BCDP.
+We begin by revisiting the connection between hypothesis testing and the definition of differential
+privacy, and demonstrate how this connection extends to the δ-BCDP definition. For an ε-LDP
+mechanism M represented by Markov kernel µ, suppose an adversary observes a realization of
+the output Y and is tasked with determining whether the input was x or x′. This scenario can be
+formulated as the following binary hypothesis problem:
+
+H0 : Y ∼ µx(·),
+
+H1 : Y ∼ µx′(·).
+
+Let the rejection region be R ⊆ Y . Denote the type I error (false alarm) rate as α(R,M,x,x′)
+
+7
+
+
+
+and the type II error (missed detection) rate as β(R,M,x,x′). We restate a known result below
+[Kairouz et al., 2015, Wasserman and Zhou, 2010].
+
+Proposition 2. A mechanism M(·) is ε-LDP iff the following condition holds for any x,x′ ∈ X and any
+R ∈ FY :
+
+eεα(R,M,x,x′) + β(R,M,x,x′) ≥ 1. (11)
+
+We note that the criterion (11) can be equivalently replaced by the criterion
+
+α(R,M,x,x′) + eεβ(R,M,x,x′) ≥ 1.
+
+As noted in Kairouz et al. [2015], this operational perspective shows that it is impossible to
+force type I and type II error rates to simultaneously vanish for a DP algorithm, and the reverse
+implication also holds.
+
+For BCDP: Now, consider a δ-BCDP mechanism M . Suppose an adversary has knowledge of
+the prior π and again observes the algorithm’s output Y . For any i ∈ [d], the adversary aims to
+distinguish whether the output was generated from data where the i-th coordinate belongs to the
+set Si or S′
+
+i. In other words, we consider the following binary hypothesis testing problem:
+
+H i
+0 : Y ∼ P{ · |xi ∈ Si},
+
+H i
+1 : Y ∼ P{ · |xi ∈ S′
+
+i}.
+
+Let the rejection region for the i-th hypothesis test be Ri ∈ FY . For the i-th test, denote the type I
+and type II error rates as α(Ri,M, Si, S
+
+′
+i) and β(Ri,M, Si, S
+
+′
+i). Then, the following result holds:
+
+Theorem 1. A pair (π,M) is δ-BCDP iff the following condition holds for every coordinate i ∈ [d]:
+
+eδiα(Ri,M, Si, S
+′
+i) + β(Ri,M, Si, S
+
+′
+i) ≥ 1, (12)
+
+for any Si, S
+′
+i ∈ F
+
++
+Xi
+
+and Ri ∈ FY .
+
+We note that the criteria (12) can be equivalently replaced by the criteria
+
+α(Ri,M, Si, S
+′
+i) + eδiβ(Ri,M, Si, S
+
+′
+i) ≥ 1.
+
+The proof of Theorem 1 is presented in Appendix A.2. Thus, the theorem shows that the vector δ in
+the δ-BCDP formulation captures the privacy loss for each of the coordinates in the same way ε in
+ε-DP captures the privacy loss of the entire data. In contrast, the vector c in c-CDP does not have
+such an interpretation of privacy loss across the coordinates.
+
+8
+
+
+
+εL-LDP εB-BDP
+
+c-CDP δ-BCDP
+
+εL = εB
+
+δ ⪯ εB1c ⪯ εL1
+
+δ ⪯ func. of (c, π)
+
+εL ≤
+∑
+
+i ci
+
+Figure 1: General relation of LDP (Definition 1), BDP (Definition 2), CDP (Definition 3) and BCDP
+(Definition 4). The condition a ⪯ b is to be read as ai ≤ bi ∀i. The implication arrows and
+the described transformation of the parameters are to be interpreted as sufficient condition. For
+example, an εL-DP mechanism is guaranteed to be c-CDP for c ⪯ εL1. The function that translates
+c-CDP under the prior π to BCDP is presented in the Proposition 4.
+
+3.2 BCDP can be achieved via LDP
+
+We begin by a simple result that follows directly from ε-BDP definition. If a mechanism is ε-LDP,
+then it is also ε-BDP. Noticing that ε-BDP ensures a ratio of eε for each coordinate as well in (10), we
+see that each coordinate has a privacy level of ε as well. Proposition 3 formalizes this observation
+and the proof can be found in Appendix A.3.
+
+Proposition 3. (LDP to BCDP) An ε-LDP mechanism satisfies ε1-BCDP.
+
+Thus, a baseline approach to implement δ-BCDP is to use a (mini δi)-LDP mechanism. Never-
+theless, this would mean that we provide the most conservative privacy guarantee required for
+one coordinate to all coordinates. However, as we will show, we can maintain an ε > min δ for the
+overall privacy guarantee while providing the δ-BCDP guarantee, therefore achieving lower error
+for downstream tasks.
+
+3.3 BCDP does not imply LDP
+
+It should be noted that BCDP does not ensure LDP, BDP, or CDP. Example 1 below demonstrates a
+mechanism that is BCDP, but not LDP.
+
+Example 1. Consider data x = (x1, x2) where x1, x2 are i.i.d. Bern(12), and let Y = {0, 1}. Let
+M be defined by the table below, with parameters a, b, c ∈ (0, 1]. Mechanism M is not LDP
+(and hence, neither BDP nor CDP). However, for BCDP, the terms P{M(x) = y|xi = 0} and
+P{M(x) = y|xi = 1} have a finite multiplicative ranges in y = 0, 1, for both i = 1, 2. For instance,
+if a = b = c = 1/2, the resulting M is (log(2), log(2))-BCDP.
+
+9
+
+
+
+P{M(x) = 1|x}
+x1
+
+0 1
+
+x2
+0 a b
+
+1 0 c
+
+The takeaway from the above example is that there can be priors and mechanisms such that the
+prior-mechanism pair is δ-BCDP but not ε-DP for any value of ε <∞. Intuitively, BCDP quantifies
+privacy loss for each coordinate. In Example 1, one cannot distinguish much about any particular
+coordinate when the output is observed due to the BCDP guarantee. However, one may still be
+able to make conclusions over the coordinates jointly. For instance, if the mechanism output in
+Example 1 is 1, then the input could not have been x = (0, 1).
+
+As this result suggests, just ensuring BCDP is not sufficient to guarantee overall privacy. In
+other words, the right way to think of BCDP is that it is a tool that allows us to quantify the privacy
+offered by an algorithm for each coordinate. The user can demand overall ε-LDP along with
+δ-BCDP where the value δi could be significantly smaller than ε for those coordinates that the user
+feels more concerned about their privacy.
+
+3.4 Achieving BCDP via CDP
+
+As we discussed earlier, CDP does not imply the BCDP, as it does not take into account the
+correlation among the features. Therefore, a natural question arises: could CDP, along with some
+bound on the dependence among the features, lead to a bound with respect to the BCDP definition?
+The next result provides an answer to this question. We denote the total variation distance between
+two distributions P and Q as TV(P,Q).
+
+Proposition 4. (CDP to BCDP) Suppose mechanism M is c-CDP and there exists q1, . . . , qd such that
+
+TV(πx−i|xi∈Si
+, πx−i|xi∈S′
+
+i
+) ≤ qi ∀ Si, S
+
+′
+i ∈ F+
+
+Xi
+. (13)
+
+Then:
+
+1. The mechanism is
+∑n
+
+i=1 ci-LDP and δ-BCDP with δi = ci + log(1 + qie
+∑
+
+j ̸=i cj − qi).
+
+2. In case that the mechanism is ε-LDP for some ε ≥ 0, then it is δ′-BCDP with δ′i = min{ci + log(1 +
+
+qie
+ε − qi), ε}.
+
+For the proof, see Appendix A.4. To better highlight this result, consider a simple example in
+which that the input’s d coordinates are redundant copies of the same value and we have access
+to a c-CDP mechanism M . Then, as Proposition 4 suggests, and given that we have qi = 1 here,
+this mechanism is δ-BCDP with δi =
+
+∑
+j cj . This is, of course, intuitive, as all coordinates reveal
+
+10
+
+
+
+information about the same value. It also reinforces that the BCDP is sensitive to correlations,
+unlike CDP. The first part of Proposition 4 provides an immediate method for constructing a BCDP
+mechanism using mechanisms that offer CDP guarantees, such as applying off-the-shelf LDP
+mechanisms per coordinate. This can also be done without requiring full knowledge of the prior.
+The second part of Proposition 4 suggests that in cases where we design an algorithm that has a
+tighter LDP guarantee than just
+
+∑n
+i=1 ci, we can further improve the BCDP bound. One example
+
+of such a construction is provided in our private mean estimation algorithm in Section 4. One
+challenge with this approach is translating the constraint δ to a vector c. In Appendix A.5, we
+provide a tractable approach to do so by imposing a linear constraint on c.
+
+3.5 Do Composition and Post-Prossesing Hold for BCDP?
+
+Composition is a widely used and well-known property of LDP. Nonetheless, as the following
+example highlights, the composition, as traditionally applied in differential privacy settings, does
+not hold in the BCDP setting.
+
+Example 2. Let x ∈ R3 be a Bernoulli vector where coordinates’ distributions are independent and
+each one is Ber(1/2). Consider the mechanism
+
+M(x) =
+
+[x1 ⊕ x2, x3]
+⊤ with probability 1
+
+2
+
+[x2, x1 ⊕ x3]
+⊤ with probability 1
+
+2 ,
+(14)
+
+where ⊕ denotes the sum in Z2. It is straightforward to verify that M(·) is in fact δ1 = 0-BCDP with
+respect to the first coordinate. However, having two independent copies of M(·) is not BCDP with
+respect to the first coordinate. To see this, consider the case where x1 = 1 and, in two copies of
+M(x), one adds x1 to x2 and the other adds it to x3. By observing the two copies, we can determine
+x1 = 1.
+
+On the other hand, the post-processing property holds for BCDP (see Appendix A.6 for the
+proof).
+
+Proposition 5. (Post processing for BCDP) Let M(·) be a δ-BCDP mechanism and K : Y → Z be a
+measurable function. Then, K ◦M is also δ-BCDP.
+
+4 Private Mean Estimation
+
+To demonstrate the practical use of the BCDP framework, we consider the private mean
+estimation problem.
+
+Problem Setup: Let there be n users submitting their data to a central server via Local DP
+mechanisms. Let user j’s data be x(j) ∈ [−1, 1]d, where x(j) is drawn from prior π(j) on [−1, 1]d; the
+server and users are not assumed to know the priors (which may be different for each individual
+
+11
+
+
+
+Mechanism 1 Proposed locally private mechanism Mmean(x, c)
+
+Input: user data x ∈ [−1, 1]d and non-decreasing vector c.
+c0 ← 0
+
+For k ∈ [d], set wk =
+(ck−ck−1)
+
+2
+
+(d−k+1)
+
+for k ∈ [d] do
+Y k ←MLDP(xk:d, ck − ck−1,
+
+√
+d− k + 1) ∈ Rd−k+1
+
+end for
+ν̂i ← (
+
+∑i
+k=1 Y
+
+k
+i+1−kwk)/(
+
+∑i
+k=1wk) for i ∈ [d]
+
+Return ν̂
+
+x1 x2 . . . xd−1 xd
+
+cd − cd−1
+
+Y d
+1
+
+cd−1 − cd−2
+
+Y d−1
+1 Y d−1
+
+2
+...
+
+...
+
+c1 − c0
+
+Y 1
+1 Y 1
+
+2
+. . . Y 1
+
+d−1 Y 1
+d
+
+Figure 2: The figure illustrates how the mechanism Mmean in Mechanism 1 obtains the estimate ν̂.
+For example, the vector Y k is obtained by taking the vector (xk, xk+1, . . . , xd) and using the LDP
+channel MLDP with privacy parameter ck − ck−1. ν̂i is obtained by taking a linear combination of
+the component of {Y k}k∈[d] corresponding to xi, i.e., directly below xi in the figure.
+
+user). Our goal is to estimate the empirical mean x̄ =
+∑n
+
+j=1
+x(j)
+
+n ∈ [−1, 1]d under ε-LDP and
+δ-BCDP. We consider l2-norm as our error metric. Without loss of generality, we assume that δ is in
+non-decreasing order. We make the following assumption regarding the priors.
+
+Assumption 1. For every i ∈ [d− 1] and every j ∈ [n], we have
+
+TV(π
+(j)
+x−i|xi∈Si
+
+, π
+(j)
+x−i|xi∈S′
+
+i
+) ≤ q ∀Si, S
+
+′
+i ∈ F+
+
+Xi
+. (15)
+
+Here q can be interpreted as a measure of how much different coordinates are interdependent.
+For instance, in the case where coordinates are independent we have q = 0, and in the case where
+they are fully equal, we have q = 1. Note that we do not need (15) to hold for the last coordinate
+(i = d). While this slight relaxation does not play a role in this section, it will be useful when we
+move to the private optimization application.
+
+It is also worth emphasizing that our analysis extends to cases where we have heterogeneous
+bounds across different coordinates (similar to (13)) and different across users. However, we opt
+for a universal bound for the sake of simplifying the presentation of results. We assume that the
+upper bound q is known to the designer of the local channels, which can be either the end user
+
+12
+
+
+
+Mechanism 2 Local DP channel for data in B2(r) proposed by Duchi et al. [2013a]
+
+Input: user data v, Local-DP level α ≥ 0, and bound r such that v ∈ B2(r).
+d←dimension(v)
+
+B ←
+√
+πdr eα+1
+
+eα−1
+
+Γ( d+1
+2
+
+)
+
+Γ( d
+2
++1)
+
+K ∼ Bern( eα
+
+eα+1)
+
+S ∼ Bern(12 + ∥v∥2
+2r )
+
+ṽ ← (2S − 1) rv
+∥v∥2
+
+Return Z ∼ Uniform(z ∈ Rd : (2K − 1)zT ṽ > 0, ∥z∥2 = B)
+
+themselves or the central server.
+Our proposed privacy mechanism Mmean (Mechanism 1) builds upon any LDP mechanism
+
+MLDP, capable of handling different dimensional inputs, that can be used for mean estimation
+as a black-box tool. While Algorithm 1 satisfies the privacy constraints for any black-box LDP
+mechanism MLDP, we shall focus on the mechanism presented by Duchi et al. [2013a] for proving
+error bounds. The mechanism of Duchi et al. [2013a], which is known to be minimax optimal
+for mean estimation, is outlined in Mechanism 2 for completeness. A figure explaining Mmean is
+presented in Figure 2.
+
+Theorem 2 shows that our proposed mechanism satisfies the desired privacy constraints and
+provides a bound on the mean-squared error (MSE). The notation a ∧ b refers to min{a, b}. later in
+this section we present a refined result with a more interpretable MSE bound in Corollary 1.
+
+Theorem 2. Suppose Assumption 1 holds and let δ̃i := min{δi, ε} for any i ∈ [d]. Then, Mmean, i.e.,
+Mechanism 1, with parameters
+
+cd = min
+
+{
+log(
+
+eζδ̃1 + q − 1
+
+q
+), δ̃d
+
+}
+, c0 = 0, (16)
+
+∀i < d, ci =
+
+cd if cd ≤ δ̃i,
+
+δ̃i − log(1 + qecd − q) otherwise,
+
+where ζ ∈ (0, 1] is a free parameter, is δ-BCDP and ε-LDP. Moreover, using Mechanism 2 as MLDP, we
+obtain the following mean-squared error bound
+
+E
+
+∥∥∥∥x̄−Π
+
+(
+1
+
+n
+
+n∑
+j=1
+
+Mmean(x
+(j), c)
+
+)∥∥∥∥2
+2
+
+∣∣∣∣x(1), . . . ,x(n)
+
+ ≲
+1
+
+n
+
+d∑
+i=1
+
+(
+1∑i
+
+k=1
+(ck−ck−1)2
+
+d−k+1
+
+)
+∧ d, (17)
+
+where Π(·) denotes projection into [−1, 1]d and the expectation is taken over the randomness in Mmean(·).
+
+The proof is presented in Appendix B.2. Here, we provide a proof sketch for the privacy
+guarantee. We first establish that Mmean is c-CDP and cd-LDP. The latter implies that Mmean also
+satisfies cd1-BCDP. Thus, if δ̃i ≥ cd, we have already shown that Mmean is δi-BCDP with respect to
+
+13
+
+
+
+the i-th coordinate. For the case where cd > δ̃i, we use Proposition 4, which essentially implies that
+Mmean is ci + log(1+ qecd − q)-BCDP with respect to the i-th coordinate. Substituting the value of ci
+from the statement of Theorem 2 gives us the desired δi-BCDP guarantee for coordinate i. Finally,
+the choice of cd in (16) ensures that the proposed ci’s are all non-negative and valid.
+
+We next make a few remarks regarding this result. First, note that while this bound applies
+to empirical mean estimation, when the data points {x(j)}nj=1 are independent and identically
+distributed, the result can also be used to derive an out-of-sample error bound for the statistical
+private mean estimation problem. In this case, an additional d
+
+n term would be added to the error
+bound. Secondly, note that in the special case where there is no coordinate-level privacy requirement
+(i.e., δi = ∞), setting ζ = 1 implies c1 = . . . = cd = ε, which yields the error bound O(d2/(nε2)).
+This matches the ε-LDP lower bound provided in Duchi et al. [2013a]. Lastly, we would like to
+discuss the role of parameter ζ. Note that when the correlation parameter q is sufficiently high or
+the most sensitive privacy requirement δ1 is low enough such that cd is determined by the first
+term, log((eζδ̃1 + q − 1)/q), in (16), one can verify that c1 = (1− ζ)δ1. As ζ increases, c1 decreases,
+leading to a worse estimate for the first coordinate. However, cd increases, indicating that, for the
+less-sensitive coordinates, we are increasing the privacy parameter, potentially resulting in lower
+estimation error for those coordinates. In other words, the parameter ζ allows us to control how we
+allocate the privacy budget of the most sensitive coordinate, δ1, between the estimation of the first
+coordinate and the privacy cost imposed by its correlation with other coordinates.
+
+We next present a corollary that studies a special case where the coordinates are divided into
+more sensitive and less sensitive groups. In this case, users requests a general ε-LDP guarantee for
+all coordinates and a δ-BCDP guarantee specifically for the more sensitive coordinates. Under this
+scenario, we further simplify the error bound which allows us to better highlight implications of
+Theorem 2.
+
+Corollary 1. Suppose we are under the premise of Theorem 2, with δi = δ for 1 ≤ i ≤ k and δi = ε > 2δ
+
+for d ≥ i > k. Then, by choosing ζ = 0.5, the mean-squared error upper bound in (17) simplifies to
+
+O(1) 1
+n
+·
+(
+dk
+
+δ2
++
+
+(d− k)2
+
+ε2
+
+)
+, (18)
+
+for the case q ≤ eδ/2−1
+eε−1 , and to
+
+O(1) 1
+n
+·
+
+(
+dk
+
+δ2
++
+
+(d− k)2
+
+d−k
+d δ2 + (cd − δ/2)2
+
+)
+, (19)
+
+otherwise, with cd = log( e
+δ/2+q−1
+
+q ) decreasing from ε to δ/2 as q increases from (eδ/2 − 1)/(eε − 1) to 1.
+
+Under the special structure of δ and ε in Corollary 1, the MSE can be thought of as sum of
+MSE of the more sensitive and the less sensitive coordinates. For low levels of correlation, the
+MSE of less private coordinates behave like the MSE of an ε-LDP mechanism on d− k dimensional
+vector but the MSE of the more sensitive part depends on the dimension d of the whole vector, not
+
+14
+
+
+
+just the sensitive part, showing how the more sensitive part of the data affects the whole vector.
+As the correlation increases q → 1, we have cd → δ/2 and the MSE matches that of a min δ-LDP
+mechanism. A supporting experiment is deferred to Appendix B.1.
+
+5 Private Least-Squares Regression
+
+We focus on how the BCDP framework can be employed on least-squares problems. Consider
+a setting in which n datapoints are distributed among n users, where x(i) = [z(i)⊤ l(i)]⊤ ∈ Rd
+
+represents the data of user i, with z(i) as the feature vector for the i-th data point and l(i) as its label.
+Our goal is to solve the following empirical risk minimization problem privately over the data of n
+users:
+
+min
+θ∈Θ
+
+f(θ) :=
+1
+
+n
+
+n∑
+i=1
+
+ℓ(θ,x(i)), (20)
+
+where ℓ(θ,x(i)) := 1
+2(θ
+
+⊤z(i) − l(i))2 and Θ ⊂ Rd−1 is a compact convex set. We denote the solution
+of (20) by f∗, achieved at some point θ∗.
+
+The customary approach in private convex optimization is to use a gradient-based method,
+perturbing the gradient at each iteration to satisfy the privacy requirements. However, this approach
+is not suitable for cases in which coordinate-based privacy guarantees are needed. The difficulty
+is that each coordinate of the gradient is typically influenced by all coordinates of the data. As a
+result, and it becomes challenging to distinguish the level of privacy offered to different coordinates
+of the data. Instead, we first perturb the users’ data locally and then compute the gradient at the
+perturbed point to update the model at the server.
+
+However, computing the gradient based on perturbed data introduces its own challenges. In
+particular, the gradient of ℓ(θ,x) with x = [z⊤l]⊤, given by
+
+∇ℓ(θ,x) = zz⊤θ − lz, (21)
+
+is not a linear function of the data. As a result, although the privacy mechanism outputs an
+unbiased estimate of the true data, this non-linearity introduces an error in the gradient with a
+non-zero mean, preventing the algorithm from converging to the optimal solution. To overcome
+this challenge, we observe that the aforementioned non-linearity in the data arises from the product
+terms zz⊤ and lz. Therefore, if we create two private copies of the data and replace each term of
+the product with one of the copies, we obtain a stochastic unbiased estimate of the gradient at the
+server. The catch, of course, is that we need to divide our privacy budget in half.
+
+A summary of the algorithm is presented in Algorithm 3. There, OPT(g, δ) refers to any convex
+optimization algorithm of choice, e.g., gradient descent, that finds the minimizer of the function
+g(·) over the set Θ and up to an error of δ. We make the assumption that the data is bounded.
+
+Assumption 2. x(i) ∈ [−1, 1]d for all i ∈ [n].
+
+We also need Assumption 1, which bounds the dependence of each coordinate on the other
+
+15
+
+
+
+Algorithm 3 BCDP and LDP least-squares regression
+
+Input: Users’ data {x(i)}ni=1 and vector c
+for i ∈ [n] do
+
+//user i sends locally perturbed data to the server
+x̂(i,1) ←Mmean(x
+
+(i), c/2)
+x̂(i,2) ←Mmean(x
+
+(i), c/2)
+end for
+//server optimizes with the perturbed data
+f̂(θ) := 1
+
+2n
+
+∑n
+i=1
+
+(
+θ⊤ẑ(i,1)ẑ(i,2)⊤θ − 2θ⊤ l̂(i,1)ẑ(i,2)
+
+)
+θ̂ ← OPT(f̂ , 1
+
+n)
+
+Return θ̂
+
+coordinates of the data. Recall that the last coordinate is exempt from this assumption, which is
+why we position the label as the last coordinate of the data. It is not reasonable to assume the
+feature vector is weakly correlated with the label, as that would violate the premise of regression.
+We next state the following result on Algorithm 3.
+
+Theorem 3. Suppose Assumptions 1 and 2 hold. Then, Algorithm 3, with c set similar to Theorem 2, is
+δ-BCDP and ε-LDP. Moreover, using Mechanism 2 as MLDP, we obtain the following error rate
+
+E
+[
+f(θ̂)− f∗
+
+∣∣∣∣x(1), . . . ,x(n)
+
+]
+≲ max
+
+θ∈Θ
+(∥θ∥2 + ∥θ∥)
+
+(
+log d√
+
+n
+(r2 + rd) ∧ d
+
+)
+, (22)
+
+with r2 =
+∑d
+
+i=1 1/(
+∑i
+
+k=1
+(ck−ck−1)
+
+2
+
+d−k+1 ).
+
+The proof of this theorem can be found in Appendix C.1. It is worth noting that r2 appears in
+the mean-squared error bound in Theorem 2. That said, if we consider special cases similar to the
+setting in Corollary 1, the term r2 would simplify in a similar manner.
+
+We conclude this section by noting that, while we focus on linear regression here, our approach
+can provide an unbiased gradient and guarantee privacy in any setting where the loss function
+ℓ(θ,x) has a quadratic (or even low-degree polynomial) dependence on x, such as neural networks
+with ℓ2 loss. However, the optimization error in such cases may require further considerations, as
+non-convex loss functions could arise.
+
+6 Acknowledgements
+
+This work was done in part while M.A. was a research fellow at the Simons Institute for the
+Theory of Computing. A.F. and M.J. acknowledge support from the European Research Council
+(ERC-2022-SYG-OCEAN-101071601). Views and opinions expressed are however those of the
+authors only and do not necessarily reflect those of the European Union or the European Research
+Council Executive Agency. Neither the European Union nor the granting authority can be held
+
+16
+
+
+
+responsible for them. S.C. acknowledges support from AI Policy Hub, U.C. Berkeley; S.C. and T.C.
+acknowledge support from NSF CCF-1750430 and CCF-2007669.
+
+References
+
+J. Acharya, K. Bonawitz, P. Kairouz, D. Ramage, and Z. Sun. Context aware local differential
+privacy. In Proceedings of the 37th International Conference on Machine Learning, pages 52–62. PMLR,
+2020.
+
+M. Alvim, K. Chatzikokolakis, C. Palamidessi, and A. Pazii. Invited paper: Local differential
+privacy on metric spaces: Optimizing the trade-off with utility. In 2018 IEEE 31st Computer
+Security Foundations Symposium (CSF), pages 262–267, 2018.
+
+M. E. Andrés, N. E. Bordenabe, K. Chatzikokolakis, and C. Palamidessi. Geo-indistinguishability:
+Differential privacy for location-based systems. In Proceedings of the 2013 ACM SIGSAC conference
+on Computer & communications security, pages 901–914, 2013.
+
+H. Asi, V. Feldman, and K. Talwar. Optimal algorithms for mean estimation under local differential
+privacy. In International Conference on Machine Learning, pages 1046–1056. PMLR, 2022.
+
+A. Beimel, K. Nissim, and E. Omri. Distributed private data analysis: Simultaneously solving
+how and what. In Advances in Cryptology–CRYPTO 2008: 28th Annual International Cryptology
+Conference, Santa Barbara, CA, USA, August 17-21, 2008. Proceedings 28, pages 451–468. Springer,
+2008.
+
+A. Beimel, K. Nissim, and U. Stemmer. Private learning and sanitization: Pure vs. approximate
+differential privacy. In International Workshop on Approximation Algorithms for Combinatorial
+Optimization, pages 363–378. Springer, 2013.
+
+S. Biswas, Y. Dong, G. Kamath, and J. Ullman. Coinpress: Practical private mean and covariance
+estimation. Advances in Neural Information Processing Systems, 33:14475–14485, 2020.
+
+T.-H. H. Chan, E. Shi, and D. Song. Optimal lower bound for differentially private multi-party
+aggregation. In Proceedings of the 20th Annual European Conference on Algorithms, ESA’12, page
+277–288. Springer-Verlag, 2012. ISBN 9783642330896.
+
+K. Chatzikokolakis, M. E. Andrés, N. E. Bordenabe, and C. Palamidessi. Broadening the scope of
+differential privacy using metrics. In Privacy Enhancing Technologies: 13th International Symposium,
+PETS 2013, Bloomington, IN, USA, July 10-12, 2013. Proceedings 13, pages 82–102. Springer, 2013.
+
+K. Chaudhuri and D. Hsu. Sample complexity bounds for differentially private learning. In
+Proceedings of the 24th Annual Conference on Learning Theory, pages 155–186. JMLR Workshop and
+Conference Proceedings, 2011.
+
+17
+
+
+
+D. Desfontaines. A list of real-world uses of differential privacy. https://desfontain.es/
+blog/real-world-differential-privacy.html, 2020. Accessed: 2024-05-22.
+
+Differential Privacy Team, Apple. Learning with privacy at scale. https://machinelearning.
+apple.com/research/learning-with-privacy-at-scale, 2017. Accessed: 2024-05-22.
+
+B. Ding, J. Kulkarni, and S. Yekhanin. Collecting telemetry data privately. Advances in Neural
+Information Processing Systems, 30, 2017.
+
+J. C. Duchi, M. I. Jordan, and M. J. Wainwright. Local privacy, data processing inequalities, and
+statistical minimax rates. arXiv preprint arXiv:1302.3203, 2013a.
+
+J. C. Duchi, M. I. Jordan, and M. J. Wainwright. Local privacy and statistical minimax rates. In 2013
+IEEE 54th Annual Symposium on Foundations of Computer Science, pages 429–438. IEEE, 2013b.
+
+C. Dwork, F. McSherry, K. Nissim, and A. Smith. Calibrating noise to sensitivity in private data
+analysis. In Theory of Cryptography: Third Theory of Cryptography Conference, TCC 2006, New York,
+NY, USA, March 4-7, 2006. Proceedings 3, pages 265–284. Springer, 2006.
+
+C. Dwork, A. Roth, et al. The algorithmic foundations of differential privacy. Foundations and
+Trends® in Theoretical Computer Science, 9(3–4):211–407, 2014.
+
+Ú. Erlingsson, V. Pihur, and A. Korolova. Rappor: Randomized aggregatable privacy-preserving or-
+dinal response. In Proceedings of the 2014 ACM SIGSAC Conference on Computer and Communications
+Security, pages 1054–1067, 2014.
+
+A. Evfimievski, J. Gehrke, and R. Srikant. Limiting privacy breaches in privacy preserving data
+mining. In Proceedings of the Twenty-second ACM SIGMOD-SIGACT-SIGART Symposium on
+Principles of Database Systems, pages 211–222, 2003.
+
+V. Feldman and K. Talwar. Lossless compression of efficient private local randomizers. In Interna-
+tional Conference on Machine Learning, pages 3208–3219. PMLR, 2021.
+
+B. Ghazi, N. Golowich, R. Kumar, P. Manurangsi, and C. Zhang. Deep learning with label differential
+privacy. Advances in Neural Information Processing Systems, 34:27131–27145, 2021.
+
+B. Ghazi, R. Kumar, P. Manurangsi, and T. Steinke. Algorithms with more granular differential
+privacy guarantees. arXiv preprint arXiv:2209.04053, 2022.
+
+X. He, A. Machanavajjhala, and B. Ding. Blowfish privacy: tuning privacy-utility trade-offs using
+policies. In Proceedings of the 2014 ACM SIGMOD International Conference on Management of Data,
+SIGMOD ’14, page 1447–1458. Association for Computing Machinery, 2014. ISBN 9781450323765.
+
+J. Imola, S. Kasiviswanathan, S. White, A. Aggarwal, and N. Teissier. Balancing utility and scalability
+in metric differential privacy. In Uncertainty in Artificial Intelligence, pages 885–894. PMLR, 2022.
+
+18
+
+https://desfontain.es/blog/real-world-differential-privacy.html
+https://desfontain.es/blog/real-world-differential-privacy.html
+https://machinelearning.apple.com/research/learning-with-privacy-at-scale
+https://machinelearning.apple.com/research/learning-with-privacy-at-scale
+
+
+P. Kairouz, S. Oh, and P. Viswanath. The composition theorem for differential privacy. In F. Bach
+and D. Blei, editors, Proceedings of the 32nd International Conference on Machine Learning, volume 37
+of Proceedings of Machine Learning Research, pages 1376–1385, Lille, France, 07–09 Jul 2015. PMLR.
+
+V. Karwa and S. Vadhan. Finite sample differentially private confidence intervals. arXiv preprint
+arXiv:1711.03908, 2017.
+
+S. P. Kasiviswanathan and A. Smith. On the ’semantics’ of differential privacy: A Bayesian
+formulation. Journal of Privacy and Confidentiality, 6(1), 2014.
+
+S. P. Kasiviswanathan, H. K. Lee, K. Nissim, S. Raskhodnikova, and A. Smith. What can we learn
+privately? SIAM Journal on Computing, 40(3):793–826, 2011.
+
+K. Kenthapadi, A. Korolova, I. Mironov, and N. Mishra. Privacy via the johnson-lindenstrauss
+transform. Journal of Privacy and Confidentiality, 5(1), Aug. 2013. doi: 10.29012/jpc.v5i1.625.
+
+D. Kifer and A. Machanavajjhala. No free lunch in data privacy. In Proceedings of the 2011 ACM
+SIGMOD International Conference on Management of data, pages 193–204, 2011.
+
+D. Kifer and A. Machanavajjhala. Pufferfish: A framework for mathematical privacy definitions.
+ACM Transactions on Database Systems (TODS), 39(1):1–36, 2014.
+
+D. Kifer, A. Smith, and A. Thakurta. Private convex empirical risk minimization and high-
+dimensional regression. In S. Mannor, N. Srebro, and R. C. Williamson, editors, Proceedings
+of the 25th Annual Conference on Learning Theory, volume 23 of Proceedings of Machine Learn-
+ing Research, pages 25.1–25.40, Edinburgh, Scotland, 25–27 Jun 2012. PMLR. URL https:
+
+//proceedings.mlr.press/v23/kifer12.html.
+
+S. Mahloujifar, C. Guo, G. E. Suh, and K. Chaudhuri. Machine learning with feature differential
+privacy. In Federated Learning and Analytics in Practice: Algorithms, Systems, Applications, and
+Opportunities, 2023.
+
+A. G. Thakurta, A. H. Vyrros, U. S. Vaishampayan, G. Kapoor, J. Freudiger, V. R. Sridhar, and
+D. Davidson. Learning new words, 2017.
+
+A. Triastcyn and B. Faltings. Bayesian differential privacy for machine learning. In International
+Conference on Machine Learning, pages 9583–9592. PMLR, 2020.
+
+J. A. Tropp. The expected norm of a sum of independent random matrices: An elementary approach.
+In High Dimensional Probability VII: The Cargese Volume, pages 173–202. Springer, 2016.
+
+S. Vadhan. The complexity of differential privacy. Tutorials on the Foundations of Cryptography:
+Dedicated to Oded Goldreich, pages 347–450, 2017.
+
+19
+
+https://proceedings.mlr.press/v23/kifer12.html
+https://proceedings.mlr.press/v23/kifer12.html
+
+
+D. Vu and A. Slavkovic. Differential privacy for clinical trial data: Preliminary evaluations. In
+2009 IEEE International Conference on Data Mining Workshops, pages 138–143, 2009. doi: 10.1109/
+ICDMW.2009.52.
+
+D. Wang and J. Xu. On sparse linear regression in the local differential privacy model. In International
+Conference on Machine Learning, pages 6628–6637. PMLR, 2019.
+
+S. L. Warner. Randomized response: A survey technique for eliminating evasive answer bias.
+Journal of the American Statistical Association, 60(309):63–69, 1965.
+
+L. Wasserman and S. Zhou. A statistical framework for differential privacy. Journal of the American
+Statistical Association, 105(489):375–389, 2010.
+
+H. Xiao and S. Devadas. Pac privacy: Automatic privacy measurement and control of data
+processing. In Annual International Cryptology Conference, pages 611–644. Springer, 2023.
+
+X. Xiong, S. Liu, D. Li, Z. Cai, and X. Niu. A comprehensive survey on local differential privacy.
+Security and Communication Networks, 2020:1–29, 2020.
+
+M. Yang, T. Guo, T. Zhu, I. Tjuawinata, J. Zhao, and K.-Y. Lam. Local differential privacy and its
+applications: A comprehensive survey. Computer Standards & Interfaces, page 103827, 2023.
+
+K. Zheng, W. Mou, and L. Wang. Collect at once, use effectively: Making non-interactive locally
+private learning possible. In International Conference on Machine Learning, pages 4130–4139. PMLR,
+2017.
+
+20
+
+
+
+A Proofs for Section 2 and Section 3
+
+A.1 Proof of Proposition 1
+
+Proposition 1. If M is ε-LDP then (π,M) is ε-BDP. Conversely, if (π,M) is ε-BDP, then (assuming Y is
+a Polish space) there exists a mechanism M ′ which is ε-LDP such that P{M(x) = M ′(x)} = 1.
+
+Proof. (A) Forward direction:
+For any R ∈ FY and S, S′ ∈ F+
+
+X , we have
+
+µx(R) ≤ eεµx′(R) (23)
+
+=⇒
+∫
+x∈S
+
+µx(R)dπ(x) ≤ eε
+∫
+x∈S
+
+µx′(R)dπ(x) (24)
+
+=⇒ P{M(x) ∈ R,x ∈ S} ≤ eεπ(S)µx′(R), (25)
+
+=⇒ P{M(x) ∈ R|x ∈ S} ≤ eεµx′(R). (26)
+
+Similarly integrate again
+∫
+x′∈S′ ·dπ(x′) to get the desired result.
+
+(B) Converse:
+Fix R ∈ FY and let
+
+U(R) = ess supx∈Xµx(R), (27)
+
+L(R) = ess infx∈Xµx(R), (28)
+
+where the essential supremum and infimum are with respect to (X ,FX , π). Fix any δ > 0 and
+define
+
+S = {x ∈ X : µx(R) > U(R)− δ}, S′ = {x ∈ X : µx(R) < L(R) + δ}. (29)
+
+By definition of essential supremum and infimum and using the fact that µ is a Markov kernel,
+S, S′ ∈ F+
+
+X .
+Using the ε-BDP condition, we can obtain
+
+U(R)− δ ≤ 1
+
+π(S)
+
+∫
+x∈S
+
+µx(R)dπ(x) (30)
+
+≤ eε
+
+π(S′)
+
+∫
+x∈S′
+
+µx(R)dπ(x) (31)
+
+≤ eε(L(R) + δ). (32)
+
+Since δ > 0 is arbitrary, we get U(R) ≤ eεL(R) ∀R ∈ FY .
+Now, for R, define
+
+E(R) := {x ∈ X : µx(R) /∈ [L(R), U(R)]}, (33)
+
+and note that π(E(R)) = 0 by definition of essential supremum and infimum and using the fact
+that µ is a Markov kernel.
+
+21
+
+
+
+We shall now modify M on a judiciously chosen π-null set to obtain an ε-LDP mechanism M ′.
+Since Y is second countable as it is a Polish space, there exists a countable collection of open sets
+V = {Vi}i≥1 ⊂ FY such that every open set R ∈ FY can be written as a disjoint union of some
+countable subset of V .
+
+Define E = ∪i≥1E(Vi) and note that π(E) = 0 by countable sub-additivity. Fix any x̄ ∈ Ec and
+define the modification M ′ of M via
+
+M ′(x) =
+
+M(x̄) if x ∈ E
+
+M(x) otherwise.
+(34)
+
+Equivalently, M ′ is represented by the Markov kernel µ′ : X × FY → [0, 1] defined by
+
+µ′
+x(R) =
+
+µx̄(R) if x ∈ E
+
+µx(R) otherwise.
+(35)
+
+Since π(E) = 0, it is easy to see that P{M(x) = M ′(x)} = 1. By construction, since E =
+
+∪i≥1E(Vi),
+µ′
+x(Vi) ≤ U(Vi) ≤ eεL(Vi) ≤ eεµ′
+
+x′(Vi) ∀x,x′ ∈ X , Vi ∈ V. (36)
+
+By second countability, and σ-additivity, we conclude,
+
+µ′
+x(R) ≤ eεµ′
+
+x′(R) ∀x,x′ ∈ X , ∀open R ∈ FY . (37)
+
+Every second countable space is Radon, so by outer regularity of both measures µx and µ′
+x, we
+
+finally obtain
+µ′
+x(R) ≤ eεµ′
+
+x′(R) ∀x,x′ ∈ X ,∀R ∈ FY . (38)
+
+Hence, M ′ is ε-LDP as desired.
+
+A.2 Proof of Theorem 1
+
+Theorem 1. A pair (π,M) is δ-BCDP iff the following condition holds for every coordinate i ∈ [d]:
+
+eδiα(Ri,M, Si, S
+′
+i) + β(Ri,M, Si, S
+
+′
+i) ≥ 1, (12)
+
+for any Si, S
+′
+i ∈ F
+
++
+Xi
+
+and Ri ∈ FY .
+
+Proof. By definition α(Ri,M, Si, S
+′
+i) = P{M(x) ∈ Ri|x ∈ Si} and
+
+P{M(x) ∈ Ti|xi ∈ Si} ≤ eδiP{M(x) ∈ Ti|xi ∈ S′
+i} ∀Si, S
+
+′
+i ∈ F+
+
+Xi
+, Ti ∈ FY (39)
+
+Setting Ti = RC
+i , get α(Ri,M, Si, S
+
+′
+i) + eδiβ(Ri,M, Si, S
+
+′
+i) ≥ 1. One can also switch Si, S
+
+′
+i above and
+
+set Ti = Ri to get eδiα(Ri,M, Si, S
+′
+i) + β(Ri,M, Si, S
+
+′
+i) ≥ 1.
+
+22
+
+
+
+The converse is straightforward as well.
+
+eδiα(Ri,M, Si, S
+′
+i) + β(Ri,M, Si, S
+
+′
+i) ≥ 1 ∀Si, S
+
+′
+i ∈ F+
+
+Xi
+, Ri ∈ FY (40)
+
+⇔ P{M(x) ∈ Ri|xi ∈ S′
+i} ≤ eδiP{M(x) ∈ Ri|xi ∈ Si} ∀Si, S
+
+′
+i ∈ F+
+
+Xi
+, Ri ∈ FY . (41)
+
+A.3 Proof of Proposition 3
+
+Proposition 3. (LDP to BCDP) An ε-LDP mechanism satisfies ε1-BCDP.
+
+Proof. By Proposition 1, an ε-DP algorithm is ε-BDP as well. Recall P{M(x) ∈ R|x ∈ S} = P (S×R)
+π(S) .
+
+Thus, ε-BDP guarntee ensures that ∀S, S′ ∈ F+
+X ,
+
+P (S ×R)
+
+π(S)
+≤ eε
+
+P (S′ ×R)
+
+π(S′)
+.
+
+Restricting to the sets of form S = Si × X−i and S′ = S′
+i × X−i for Si, S
+
+′
+i ∈ F
+
++
+Xi
+
+above yields the
+desired BCDP result.
+
+A.4 Proof of Proposition 4
+
+Proposition 4. (CDP to BCDP) Suppose mechanism M is c-CDP and there exists q1, . . . , qd such that
+
+TV(πx−i|xi∈Si
+, πx−i|xi∈S′
+
+i
+) ≤ qi ∀ Si, S
+
+′
+i ∈ F+
+
+Xi
+. (13)
+
+Then:
+
+1. The mechanism is
+∑n
+
+i=1 ci-LDP and δ-BCDP with δi = ci + log(1 + qie
+∑
+
+j ̸=i cj − qi).
+
+2. In case that the mechanism is ε-LDP for some ε ≥ 0, then it is δ′-BCDP with δ′i = min{ci + log(1 +
+
+qie
+ε − qi), ε}.
+
+Proof. Consider the sets R ∈ FY such that P{M(x) ∈ R} = 0, then for Si, S
+′
+i ∈ F
+
++
+Xi
+
+, we have
+P{M(x) ∈ R|xi ∈ Si} = P{M(x) ∈ R|xi ∈ S′
+
+i} = 0. Thus, to bound the δ in δ-BCDP guarantee,
+we can restrict to R in the set F+
+
+Y := {R ∈ FY |P{M(x) ∈ R} > 0}.
+For Si, S
+
+′
+i ∈ F
+
++
+Xi
+
+, R ∈ F+
+Y ,
+
+P{M(x) ∈ R|xi ∈ Si}
+P{M(x) ∈ R|xi ∈ S′
+
+i}
+=
+
+P{M(x) ∈ R, xi ∈ Si}
+π{xi ∈ Si}
+
+π{xi ∈ S′
+i}
+
+P{M(x) ∈ R, xi ∈ S′
+i}
+. (42)
+
+23
+
+
+
+For the set R under consideration, define
+
+l(x−i) = inf
+xi∈Xi
+
+µxi,x−i(R), (43)
+
+u(x−i) = sup
+xi∈Xi
+
+µxi,x−i(R). (44)
+
+By CDP property, we have u(x−i) ≤ eci l(x−i). Now note that
+
+P{M(x) ∈ R, xi ∈ Si}
+π{xi ∈ Si}
+
+=
+1
+
+π{xi ∈ Si}
+
+∫
+x−i∈X−i,xi∈Si
+
+µxi,x−i(R)dπ(xi,x−i) (45)
+
+≤ 1
+
+π{xi ∈ Si}
+
+∫
+x−i∈X−i,xi∈Si
+
+u(x−i)dπ(xi,x−i) (46)
+
+=
+
+∫
+x−i∈X−i
+
+u(x−i)dπx−i|xi∈Si
+(x−i). (47)
+
+Similarly, we have
+
+P{M(x) ∈ R, xi ∈ S′
+i}
+
+P{xi ∈ S′
+i}
+
+≥
+∫
+x−i∈X−i
+
+l(x−i)dπx−i|xi∈S′
+i
+(x−i). (48)
+
+Using (47) and (48) in (42), we obtain
+
+P{M(x) ∈ R|xi ∈ Si}
+P{M(x) ∈ R|xi ∈ S′
+
+i}
+≤
+
+∫
+x−i∈X−i
+
+u(x−i)dπx−i|xi∈Si
+(x−i)∫
+
+x−i∈X−i
+l(x−i)dπx−i|xi∈S′
+
+i
+(x−i)
+
+(49)
+
+≤ eci
+
+∫
+x−i∈X−i
+
+l(x−i)dπx−i|xi∈Si
+(x−i)∫
+
+x−i∈X−i
+l(x−i)dπx−i|xi∈S′
+
+i
+(x−i)
+
+(50)
+
+≤ eci
+(
+1 + TV(πx−i|xi∈Si
+
+, πx−i|Xi∈S′
+i
+)
+maxx−i l(x−i)−minx−i l(x−i)
+
+minx−i l(x−i)
+
+)
+(51)
+
+≤ eci
+(
+1 + TV(πx−i|xi∈Si
+
+, πx−i|xi∈S′
+i
+)(e
+
+∑
+j ̸=i cj − 1)
+
+)
+, (52)
+
+where we used
+maxx−i l(x−i)
+
+minx−i l(x−i)
+≤ e
+
+∑
+j ̸=i cj by CDP property.
+
+The
+∑
+
+i ci-LDP property follows by straightforward composition.
+Finally, notice that, in case that we know the mechanism is ε-LDP, we can bound
+
+maxx−i l(x−i)
+
+minx−i l(x−i)
+by
+
+eε. In addition, by Proposition 3, we know δ′i ≤ ε. Thus, we get δ′i ≤ min{ci + log(1 + qie
+ε − qi), ε}
+
+A.5 Additional Results for Section 3.4
+
+Proposition 6. Let
+
+Aδ[i, j] =
+
+
+1
+δi
+
+i = j,
+
+1
+
+log
+
+(
+1+ eδi−1
+
+qi
+
+) else. (53)
+
+24
+
+
+
+Then, the condition Aδc ≤ 1 implies δi ≥ ci + log(1 + qie
+∑
+
+j ̸=i cj − qi) for all i ∈ [d].
+
+Proof. Without loss of generality, we establish the proof for i = 1. For a given value of c1, we have
+the constraint that
+
+d∑
+j=2
+
+cj ≤ log
+
+(
+1 +
+
+eδ1−c1 − 1
+
+q1
+
+)
+. (54)
+
+Note that g(x) = log
+(
+1 + eδ1−x−1
+
+q1
+
+)
+is concave and g(0) = log
+
+(
+1 + eδ1−1
+
+q1
+
+)
+and g(δ1) = 0. Thus,
+
+g(x) ≥
+(
+1− x
+
+δ1
+
+)
+log
+(
+1 + eδ1−1
+
+q1
+
+)
+. Therefore, we can ensure (54) by imposing
+
+d∑
+j=2
+
+cj ≤
+(
+1− c1
+
+δ1
+
+)
+log
+
+(
+1 +
+
+eδ1 − 1
+
+q1
+
+)
+. (55)
+
+A.6 Proof of Proposition 5
+
+Proposition 5. (Post processing for BCDP) Let M(·) be a δ-BCDP mechanism and K : Y → Z be a
+measurable function. Then, K ◦M is also δ-BCDP.
+
+Proof. Let the σ-field on Z be denoted by FZ . For T ∈ FZ , Y (T ) := {y ∈ Y|K(y) ∈ T} ∈ FY since
+K is a measurable function. Thus, we have the following for any i ∈ [d], T ∈ FZ and Si, S
+
+′
+i ∈ F
+
++
+Xi
+
+by BCDP guarantees on M
+
+P{K(M(x)) ∈ T |xi ∈ Si} = P{M(x) ∈ Y (T )|xi ∈ Si} (56)
+
+≤ eδiP{M(x) ∈ Y (T )|xi ∈ S′
+i} (57)
+
+= eδiP{K(M(x)) ∈ T |xi ∈ S′
+i}. (58)
+
+B Private Mean Estimation
+
+B.1 Numerical Experiment
+
+Here, we provide a simple numerical experiment to validate the performance of our proposed
+algorithm. For baseline comparison, we consider the MLDP privacy mechanism from Duchi et al.
+[2013b] with privacy parameter min δ. For our proposed privacy mechanism Mmean, we have a
+degree of freedom in choosing ζ. We note that, as q → 1, we would want ζ → 1 since in this case,
+the best algorithm is to do min δ-LDP. As q → 0, we would want ci = δ̃i as CDP is ideal in this case.
+Thus, we settle with a heuristic choice ζ = (1 + q)/2.
+
+25
+
+
+
+Figure 3: MSE as q is varied keeping δ and ε constant for Mmean and min δ-LDP.
+
+We first construct a distribution for which Assumption 1 holds. We consider the distribution
+where
+
+Z ∼ Bern
+
+(
+1
+
+2
+
+)
+, (59)
+
+(x1, . . . , xd) =
+
+(Z, . . . , Z) w.p. q
+
+i.i.d. Bern
+(
+1
+2
+
+)
+else.
+
+(60)
+
+It is easy to verify that TV(πx−i|xi=1, πx−i|xi=0) = q ∀i in this setting. We fix d = 10, δ =
+
+(0.2, 0.2, ε, ε, . . . , ε), and ε = 2. This coordinate-wise privacy demand captures the impact of
+requiring more privacy protection for the first two-coordinates on the algorithm’s error.
+
+We vary the correlation q and plot the median MSE values, along with the 25-th and 75-th
+quantiles, for our proposed algorithm BCDP and the baseline algorithm in Figure 3. We set
+n = 10000, and sample user data i.i.d. 2×Bern(12)− 1. The experiment is run over 1000 trials.
+
+When q ≈ 1, there is a high degree of correlation between the coordinates and our algorithm
+resembles min δ-LDP. For other values of q, the proposed BCDP algorithm can leverage the hetero-
+geneous nature of the privacy demand and obtain better performance.
+
+B.2 Proofs
+
+Theorem 2. Suppose Assumption 1 holds and let δ̃i := min{δi, ε} for any i ∈ [d]. Then, Mmean, i.e.,
+Mechanism 1, with parameters
+
+cd = min
+
+{
+log(
+
+eζδ̃1 + q − 1
+
+q
+), δ̃d
+
+}
+, c0 = 0, (16)
+
+26
+
+
+
+∀i < d, ci =
+
+cd if cd ≤ δ̃i,
+
+δ̃i − log(1 + qecd − q) otherwise,
+
+where ζ ∈ (0, 1] is a free parameter, is δ-BCDP and ε-LDP. Moreover, using Mechanism 2 as MLDP, we
+obtain the following mean-squared error bound
+
+E
+
+∥∥∥∥x̄−Π
+
+(
+1
+
+n
+
+n∑
+j=1
+
+Mmean(x
+(j), c)
+
+)∥∥∥∥2
+2
+
+∣∣∣∣x(1), . . . ,x(n)
+
+ ≲
+1
+
+n
+
+d∑
+i=1
+
+(
+1∑i
+
+k=1
+(ck−ck−1)2
+
+d−k+1
+
+)
+∧ d, (17)
+
+where Π(·) denotes projection into [−1, 1]d and the expectation is taken over the randomness in Mmean(·).
+
+Proof. Our proof has two main parts that are presented below: proof of privacy guarantee, and
+proof of the error bounds.
+
+Proof of privacy: Note that we use the channel MLDP(.) a total of d times with varying size
+inputs in Mechanism 1. Focusing on any particular data point x, let
+
+M̃(x) :=
+(
+MLDP(xi:d, ci − ci−1,
+
+√
+d− i+ 1)
+
+)d
+i=1
+
+. (61)
+
+First, notice that, by composition, M̃ is cd-LDP. Given that cd ≤ δ̃d ≤ ε, this immediately implies
+that our algorithm is ε-LDP. To show the BCDP bound, given Proposition 5, it suffices to show M̃ is
+δ-BCDP. First, notice that Proposition 3, along with choice of cd ≤ δ̃d, implies that this algorithm is
+δd-BCDP with respect to coordinate d. In fact, for any i for which cd ≤ δ̃i, a similar argument implies
+that M̃ is δ̃i-BCDP with respect to coordinate i. Hence, we could only focus on other coordinates
+i < d for which cd > δ̃i.
+
+Next, we claim that M̃(x) is c-CDP. To see this, notice that, by perturbing the k-th coordinate
+of x, the terms affected in M̃(x) are MLDP(xi:d, ci − ci−1,
+
+√
+d− i+ 1) for i ≤ k; in Figure 2, this
+
+corresponds to the bottom i rows of the Y (s), i.e., {Y k}k∈[i]. Thus, it suffices to show
+
+M̃k(x) :=
+(
+MLDP(xi:d, ci − ci−1,
+
+√
+d− i+ 1)
+
+)k
+i=1
+
+(62)
+
+is ck-CDP with respect to coordinate k. However, this immediately follows as M̃k is ck-LDP,
+implying it is also ck-CDP with respect to the k-th coordinate.
+
+As a result, by the second part of Proposition 4, and given that M̃ is cd-LDP and Assumption 1
+holds, we obtain that M̃ is ci + log(1 + qecd − q)-BCDP with respect to coordinate i. It remains to
+show that ci + log(1 + qecd − q) ≤ δi for any i < d. This also follows from the choice of ci for i < d
+
+and cd > δ̃i, which are the conditions we are operating under. It is worth noting that the condition
+
+cd ≤ log(
+eζδ̃1 + q − 1
+
+q
+) (63)
+
+guarantees that the chosen ci’s are nonnegative, given ζ ∈ (0, 1).
+
+27
+
+
+
+Proof of the mean-squared error bound:
+Duchi et al. [2013a] show that the channel MLDP(·)’s output is unbiased and it holds that for
+
+any x ∈ [−1, 1]d, we have
+
+E[∥MLDP(x, ε, d)− x∥22|x] ≤ O(d)
+(
+
+d
+
+ε2
+∧ 1
+
+)
+. (64)
+
+Note that, due to the symmetry of Algorithm 2, the error is identically distributed across each
+coordinate in expectation. Hence, for any vector x and any k ≤ i, the random variable Y k
+
+i−k+1 is an
+
+unbiased estimators of xi with its variance bounded by O(1)
+(
+
+d−i+1
+(ci−ci−1)2
+
+∧ 1
+)
+
+.
+Note that, the errors from different runs of the algorithm are independent. Therefore, using
+
+the Cauchy–Schwarz inequality, we can see that the minimum variance in estimating xi through
+a linear combination of Y (i,j) is achieved by choosing weights proportional to the inverse of the
+variances which would result in the following estimator∑i
+
+k=1 Y
+k
+i+1−kwk∑i
+
+k=1wk
+
+(65)
+
+with the error rate given by
+
+O(1) 1∑i
+k=1
+
+(ck−ck−1)2
+
+d−k+1
+
+∧ 1. (66)
+
+Also, note that, the algorithm’s runs over different users are independent. Therefore, taking average
+of Mmean(x
+
+(j), c) over j, i.e., different users’ data, gives us an estimator of
+
+1
+
+n
+
+n∑
+j=1
+
+x
+(j)
+i (67)
+
+with the error rate
+O(1) 1
+
+n
+· 1∑i
+
+k=1
+(ck−ck−1)2
+
+d−k+1
+
+∧ 1. (68)
+
+Summing this over the coordinates gives us the following upper bound:
+
+O(1) 1
+n
+
+d∑
+i=1
+
+1∑i
+k=1
+
+(ck−ck−1)2
+
+d−k+1
+
+∧ d. (69)
+
+Corollary 1. Suppose we are under the premise of Theorem 2, with δi = δ for 1 ≤ i ≤ k and δi = ε > 2δ
+
+for d ≥ i > k. Then, by choosing ζ = 0.5, the mean-squared error upper bound in (17) simplifies to
+
+O(1) 1
+n
+·
+(
+dk
+
+δ2
++
+
+(d− k)2
+
+ε2
+
+)
+, (18)
+
+28
+
+
+
+for the case q ≤ eδ/2−1
+eε−1 , and to
+
+O(1) 1
+n
+·
+
+(
+dk
+
+δ2
++
+
+(d− k)2
+
+d−k
+d δ2 + (cd − δ/2)2
+
+)
+, (19)
+
+otherwise, with cd = log( e
+δ/2+q−1
+
+q ) decreasing from ε to δ/2 as q increases from (eδ/2 − 1)/(eε − 1) to 1.
+
+Proof. For convenience, we set ζ = 0.5. We do not focus on refining the constants in the Mean-
+Squared Error (MSE) bound with a potentially better choice of ζ. Now consider two cases for the
+correlation bound q
+
+1. q ∈ [0, e
+δ/2−1
+eε−1 ]: in this case, we have ck+1 = ck+2 = . . . = cd = ε and c1 = c2 = . . . = ck =
+
+δ− log(1+ qeε− q). Using the range of q, we get δ− log(1+ qeε− q) ∈ [δ/2, δ]. Thus, replacing
+the c1 to ck values by the worst-case of δ/2 we get an error of
+
+MSE ≲
+d
+
+n
+
+(
+k
+
+δ2
++
+
+d− k
+
+δ2 + d
+d−k (ε− δ/2)2
+
+)
+∧ d (70)
+
+Using ε ≥ 2δ, we get
+
+MSE ≲
+
+(
+dk
+
+nδ2
++
+
+(d− k)2
+
+nε2
+
+)
+∧ d (71)
+
+2. q ∈ ( e
+δ/2−1
+eε−1 , 1]: in this case we have ck+1 = . . . = cd = log eδ/2+q−1
+
+q and c1 = . . . = ck =
+
+δ − log(1 + qecd − q) = δ/2. Thus, we get an error of
+
+MSE ≲
+
+ dk
+
+nδ2
++
+
+(d− k)d
+
+n
+(
+δ2 + d
+
+d−k (cd − δ/2)2
+)
+ ∧ d (72)
+
+C Least-Squares Regression
+
+C.1 Proof of Theorem 3
+
+Theorem 3. Suppose Assumptions 1 and 2 hold. Then, Algorithm 3, with c set similar to Theorem 2, is
+δ-BCDP and ε-LDP. Moreover, using Mechanism 2 as MLDP, we obtain the following error rate
+
+E
+[
+f(θ̂)− f∗
+
+∣∣∣∣x(1), . . . ,x(n)
+
+]
+≲ max
+
+θ∈Θ
+(∥θ∥2 + ∥θ∥)
+
+(
+log d√
+
+n
+(r2 + rd) ∧ d
+
+)
+, (22)
+
+with r2 =
+∑d
+
+i=1 1/(
+∑i
+
+k=1
+(ck−ck−1)
+
+2
+
+d−k+1 ).
+
+Proof. Proof of privacy: The proof of the privacy guarantee follows a similar structure to the proof
+of Theorem 2. Note that while composition does not hold for BCDP, it does hold for LDP and
+
+29
+
+
+
+CDP. This is why we divide c by two, rather than dividing δ by two. Additionally, since the OPT
+algorithm only observes the private copies of the data, by the post processing inequality, it does not
+matter how the algorithm finds the minimizer (e.g., how many passes it makes over each private
+data point), as the privacy guarantee remains unchanged.
+
+Proof of error rate: Without loss of generality, we can ignore the constant term in f(·) that does
+not depend on θ, and hence, with a slight abuse of notation, we can rewrite f(·) as
+
+f(θ) :=
+1
+
+2n
+
+n∑
+i=1
+
+(
+θ⊤z(i)z(i)⊤θ − 2θ⊤l(i)z(i)
+
+)
+. (73)
+
+Also, recall that f̂(·) is given by
+
+f̂(θ) :=
+1
+
+2n
+
+n∑
+i=1
+
+(
+θ⊤ẑ(i,1)ẑ(i,2)⊤θ − 2θ⊤ l̂(i,1)ẑ(i,2)
+
+)
+. (74)
+
+Denote the minimizer of f̂(θ) over Θ by θ∗({x̂(i,1), x̂(i,2)}ni=1). Also, we denote the output of
+Algorithm 3 by θ̂({x̂(i,1), x̂(i,2)}ni=1). Finally, recall that θ∗ denotes the minimizer of function f .
+
+For convenience and brevity, we drop the conditioning on x(1), . . . ,x(n) from the notation, but all
+expectations henceforth are conditioned on x(1), . . . ,x(n).
+
+Next, note that
+
+1. By the definition of OPT, we have
+
+f̂
+(
+θ̂({x̂(i,1), x̂(i,2)}ni=1)
+
+)
+− f̂
+
+(
+θ∗({x̂(i,1), x̂(i,2)}ni=1)
+
+)
+≤ 1
+
+n
+. (75)
+
+2. By the definition of θ∗({x̂(i,1), x̂(i,2)}ni=1), we have
+
+f̂
+(
+θ∗({x̂(i,1), x̂(i,2)}ni=1)
+
+)
+− f̂(θ∗) ≤ 0. (76)
+
+3. Given the construction of f̂ , it is an unbiased estimator of f for any fixed θ. Hence, we have
+
+E[f̂(θ∗)− f(θ∗)] = 0. (77)
+
+Summing all the three, given us
+
+E
+[
+f̂
+(
+θ̂({x̂(i,1), x̂(i,2)}ni=1)
+
+)
+− f(θ∗)
+
+]
+≤ 1
+
+n
+. (78)
+
+However, we need to bound
+
+E
+[
+f
+(
+θ̂({x̂(i,1), x̂(i,2)}ni=1)
+
+)
+− f(θ∗)
+
+]
+. (79)
+
+30
+
+
+
+Therefore, it suffices to bound
+
+E
+[
+f
+(
+θ̂({x̂(i,1), x̂(i,2)}ni=1)
+
+)
+− f̂
+
+(
+θ̂({x̂(i,1), x̂(i,2)}ni=1)
+
+)]
+. (80)
+
+Observe that this term is upper bounded by
+
+E
+[
+sup
+θ
+(f(θ)− f̂(θ))
+
+]
+. (81)
+
+Note that (81) is upper bounded by
+
+sup
+θ∈Θ
+∥θ∥2E
+
+[∥∥∥∥∥ 1n
+n∑
+
+i=1
+
+z(i)z(i)⊤ − ẑ(i,1)ẑ(i,2)⊤
+
+∥∥∥∥∥
+]
++ sup
+
+θ∈Θ
+∥θ∥E
+
+[∥∥∥∥∥ 1n
+n∑
+
+i=1
+
+l(i)z(i) − l̂(i,1)ẑ(i,2)
+
+∥∥∥∥∥
+]
+. (82)
+
+We bound the first term above. The second term can be bounded similarly. To do so, first note that
+we can decompose ẑ(i,1)ẑ(i,2)⊤ − z(i)z(i)⊤ as
+
+(ẑ(i,1) − z(i))z(i)⊤ + z(i)(ẑ(i,2) − z(i))⊤ + (ẑ(i,1) − z(i))(ẑ(i,2) − z(i))⊤. (83)
+
+Hence, it suffices to bound the expected norm of the average of each term separately, and all of
+them can be handled similarly. We will focus on the last term in particular, i.e., we will bound
+
+E
+
+[∥∥∥∥∥ 1n
+n∑
+
+i=1
+
+Ai
+
+∥∥∥∥∥
+]
+
+(84)
+
+with Ai := (ẑ(i,1) − z(i))(ẑ(i,2) − z(i))⊤. Next, we make the following claim regarding matrices
+{Ai}ni=1, proved in Appendix C.2.
+
+Lemma 1. Let
+r2 := sup
+
+x∈[−1,1]d
+E[∥Mmean(x, c/2)− x∥2|x]. (85)
+
+Then, the following two results hold:
+
+∥
+∑
+i
+
+E[AiAi⊤ ]∥ ≤ nr4, (86)
+
+E[max
+i
+∥Ai∥2] ≤ nr4. (87)
+
+Let us first show how this lemma completes the proof. Using Theorem 1 in Tropp [2016],
+Jensen’s inequality, along with this lemma, we can immediately upper bound (84) by
+
+O(1) log(d) r2√
+n
+. (88)
+
+Similarly, the terms ∥(ẑ(i,1)−z(i))z(i)⊤∥ and ∥z(i)(ẑ(i,2)−z(i))⊤∥ can be upper bounded byO( log(d)rd√
+n
+
+)
+
+31
+
+
+
+using similar steps as proof of Lemma 1.
+Recall r2 = O(1)
+
+∑d
+i=1
+
+1∑i
+k=1
+
+(ck−ck−1)
+2
+
+d−k+1
+
+. Note that we use Mmean without the truncation to [−1, 1]d
+
+to preserve unbaisedness, and hence, the minimum with d does not appear in r2, unlike Theorem 2.
+Thus we obtain the bound
+
+E
+[
+sup
+θ
+(f(θ)− f̂(θ))
+
+]
+≲ max
+
+θ∈Θ
+(∥θ∥2 + ∥θ∥)
+
+(
+r2 log d√
+
+n
++
+
+rd log d√
+n
+
+)
+. (89)
+
+We can also project the estimate θ̂ to the set Θ to obtain the bound maxθ∈Θ(∥θ∥2 + ∥θ∥)d. Taking
+minimum of the terms, we get Theorem 3.
+
+C.2 Proof of Lemma 1
+
+First, note that
+AiAi⊤ = ∥ẑ(i,2) − z(i)∥2(ẑ(i,1) − z(i))(ẑ(i,1) − z(i))⊤, (90)
+
+which yields
+∥E[AiAi⊤ ]∥ ≤ r2E[∥(ẑ(i,1) − z(i))(ẑ(i,1) − z(i))⊤∥]. (91)
+
+Using the result that ∥uu⊤∥ = ∥u∥2 for any vector u completes the proof of the first part of the
+lemma. To prove the second part, note that
+
+E[max
+i
+∥Ai∥2] ≤ E[
+
+n∑
+i=1
+
+∥Ai∥2] =
+n∑
+
+i=1
+
+E[∥Ai∥2]. (92)
+
+Using the result that ∥uv⊤∥ ≤ ∥u∥∥v∥ for any two vectors u and v implies
+
+E[∥Ai∥2] ≤ E
+[
+∥ẑ(i,1) − z(i)∥2∥ẑ(i,2) − z(i)∥2
+
+]
+. (93)
+
+Finally, the conditional independence of ẑ(i,1) and ẑ(i,2) given z(i) completes the proof of lemma.
+
+32
+
+
+	Introduction
+	Problem Formulation
+	Properties of BCDP
+	BCDP through the Lens of Hypothesis Testing
+	BCDP can be achieved via LDP
+	BCDP does not imply LDP
+	Achieving BCDP via CDP
+	Do Composition and Post-Prossesing Hold for BCDP?
+
+	Private Mean Estimation
+	Private Least-Squares Regression
+	Acknowledgements
+	Proofs for Section 2 and Section 3
+	Proof of lemma:LDPBayesian
+	Proof of theorem:HT
+	Proof of proposition:LDPtoBCDP
+	Proof of prop:cdp-to-bdp
+	Additional Results for Section 3.4
+	Proof of lemma:bdpdataprocessing
+
+	Private Mean Estimation
+	Numerical Experiment
+	Proofs
+
+	Least-Squares Regression
+	Proof of theorem:LSE
+	Proof of lemma:matrix
+
+

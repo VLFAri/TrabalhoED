@@ -1,0 +1,2841 @@
+
+Formal Privacy Guarantees with Invariant Statistics
+
+Formal Privacy Guarantees with Invariant Statistics
+
+Young Hyun Cho cho472@purdue.edu
+Department of Statistics
+Purdue University
+150 N University St, West Lafayette, IN 47907
+
+Jordan Awan jawan@purdue.edu
+
+Department of Statistics
+
+Purdue University
+
+150 N University St, West Lafayette, IN 47907
+
+Abstract
+
+Motivated by the 2020 US Census products, this paper extends differential privacy (DP) to address
+the joint release of DP outputs and nonprivate statistics, referred to as invariant. Our framework,
+Semi-DP, redefines adjacency by focusing on datasets that conform to the given invariant, ensuring
+indistinguishability between adjacent datasets within invariant-conforming datasets. We further
+develop customized mechanisms that satisfy Semi-DP, including the Gaussian mechanism and the
+optimal K-norm mechanism for rank-deficient sensitivity spaces. Our framework is applied to
+contingency table analysis which is relevant to the 2020 US Census, illustrating how Semi-DP
+enables the release of private outputs given the one-way margins as the invariant. Additionally,
+we provide a privacy analysis of the 2020 US Decennial Census using the Semi-DP framework,
+revealing that the effective privacy guarantees are weaker than advertised.
+
+Keywords: Differential privacy, Sensitivity space, K-norm mechanism, Contingency table anal-
+ysis, US decennial census.
+
+1. Introduction
+
+In the era of big data and pervasive digital tracking, safeguarding individual privacy has become in-
+creasingly critical. Differential Privacy (DP) (Dwork et al., 2006) has emerged as the gold standard
+for ensuring strong privacy protections while enabling meaningful data analysis. A key advantage
+of DP is its ability to provide individual-level protection, offering both data curators and users a
+straightforward understanding on the privacy protection. DP achieves this by ensuring that the
+outputs from two adjacent databases—databases that differ by a single entry—have similar dis-
+tributions, with this similarity quantified by a privacy parameter. To maintain DP, data curators
+introduce calibrated noise based on the maximum difference in outputs that adjacent databases
+can produce, effectively masking the contribution of any individual entry. This privacy framework
+has been widely adopted by major tech companies such as Google (Erlingsson et al., 2014), Ap-
+ple (Team et al., 2017), and Microsoft (Ding et al., 2017), as well as in the public sector, where
+protecting sensitive information is crucial, exemplified by the practices of the US Census Bureau
+(Abowd et al., 2022).
+
+While DP has proven effective in many contexts, real-world applications often demand the
+publication of true statistics on confidential data alongside DP outputs, particularly when such
+statistics are necessary or when the perceived public benefits are substantial. For instance, in the
+2020 US Decennial Census, the US Census Bureau provided noisy demographic counts that satisfy
+DP but also disclosed certain counts without noise, such as the total resident populations of states
+
+1
+
+
+Cho and Awan
+
+for electoral representation purposes (Abowd et al., 2022). These accurate counts, referred to as
+invariants, reveal true information about the confidential data, potentially compromising privacy.
+
+The joint release of DP outputs and invariants differ from standard DP scenarios, and privacy
+guarantees in these settings are still underexplored. Motivated by the 2020 Census, in Gao et al.
+(2022), Subspace Differential Privacy (Subspace DP) was introduced and further studied in Dha-
+rangutte et al. (2023). It is applicable when the invariant is a linear transformation of a query, and
+considers DP on subspaces unaffected by the linear transformation. While Subspace DP provides
+some insight into what the Census mechanism protects, it is not the ideal framework for quantifying
+the privacy protection. Like traditional DP, it considers databases differing by a single entry, but
+these adjacent databases may yield different invariants, allowing an adversary to identify confiden-
+tial data. This is particularly problematic when the invariants are count statistics, as seen in the
+2020 US Census as databases differing by a single entry have different counts.
+
+In response, we build upon the framework of semi-differential privacy (Semi-DP), initially intro-
+duced in Awan and Vadhan (2023), to address the challenges posed by invariant. A key observation
+is that the release of invariant constrains the set of possible databases that can be protected. To
+account for this, we explicitly consider invariant-conforming databases and redefine the adjacency
+relation to ensure indistinguishability within this reduced set. Our approach guarantees that the
+confidential data remains indistinguishable from any adjacent database within the set of invariant-
+conforming databases, even when both the invariants and the DP outputs are released jointly.
+Additionally, we introduce customized mechanism designs that data curators can use to publish
+specific invariants and DP outputs in accordance with our framework.
+
+1.1 Related Literature
+
+Several studies have explored differential privacy in the context of public information, notably sub-
+space differential privacy as introduced in Gao et al. (2022), as well as the work of Gong and Meng
+(2020) and Seeman et al. (2022). Both Gao et al. (2022) and Gong and Meng (2020) assume that
+the invariants are linear transformations of the query which is privatized with a DP mechanism.
+This aligns well with settings like the 2020 Decennial Census where certain aggregate statistics are
+published without noise. However, this assumption does not apply in scenarios where no linear
+relationship exists between the DP query and the invariant. For example, consider a biomedical
+research setting where true demographic counts are released without noise while regression coeffi-
+cients are privatized with DP. In such cases, the frameworks proposed in the prior works are not
+be applicable.
+
+Seeman et al. (2022) introduced the (ϵ, {Θz}z∈Z)-Pufferfish framework, which extends Pufferfish
+privacy (Kifer and Machanavajjhala, 2014) by incorporating a collection of mechanisms indexed
+by the realizations of a random variable Z. This variable represents public information related
+to the confidential data that is not protected by the DP mechanism. While this approach offers
+nuanced privacy protection, it introduces complexity and practical challenges, making it difficult
+to implement and interpret. Furthermore, it does not operate strictly within the traditional DP
+framework.
+
+Our work diverges from these approaches by focusing on invariant-conforming databases, where
+traditional DP adjacency relations may not hold. Building upon the Semi-DP example in Awan
+and Vadhan (2023), we draw inspiration from Awan and Slavković (2021) and Kim et al. (2022)
+in designing mechanisms that inject noise based on sensitivity space. Awan and Slavković (2021)
+introduced sensitivity space as a key tool for mechanism design, which we adapt to the invariant-
+conforming setting. Additionally, Kim et al. (2022) provided insights on reducing noise when the
+sensitivity space is rank-deficient, an idea we generalize to all common additive mechanisms.
+
+2
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+Finally, to avoid confusion in terminology, it is important to note that Lowy et al. (2023)
+also adopted the term Semi-DP. However, their work fundamentally differs from ours. In Lowy
+et al. (2023), Semi-DP refers to private model training using public data that does not require
+protection. In contrast, our notion of Semi-DP originated from Awan and Vadhan (2023), where it
+was developed as a tool to bound the power of differentially private uniformly most powerful(UMP)
+tests by allowing some summary statistics to be released without privacy protection. As suggested
+in Awan and Vadhan (2023), we demonstrate that Semi-DP is of independent interest, providing
+a novel framework for analyzing privacy protection in scenarios, which involve the joint release of
+invariant and DP mechanisms.
+
+1.2 Our Contributions
+
+This paper addresses a critical gap in privacy research by introducing Semi-DP, a novel extension
+of DP tailored for scenarios where true statistics, or invariants, are released alongside DP outputs.
+Semi-DP redefines adjacency to operate within invariant-conforming datasets, thereby safeguarding
+sensitive information even when true statistics are disclosed. Our key contributions are threefold:
+
+• Extension of Semi-DP Framework: Building upon the Semi-DP framework originally
+introduced in Awan and Vadhan (2023), we significantly extend its application to address
+the joint release of arbitrary DP outputs and invariants. Our extension provides a more
+comprehensive privacy analysis for scenarios where traditional DP models fall short, offering
+greater clarity in understanding privacy risks in complex data scenarios.
+
+• Optimal Mechanism Design: We develop customized mechanisms that satisfy the Semi-
+DP framework, including the optimal K-norm mechanism, which is particularly effective for
+rank-deficient sensitivity spaces often encountered due to invariant. Our approach retains
+the core structure of DP, allowing existing DP methods like Laplace, Gaussian, and K-norm
+mechanisms to be adapted with minimal modifications. By leveraging the sensitivity space,
+our mechanisms minimize noise addition while preserving privacy. Moreover, we propose a
+private uniformly most powerful unbiased (UMPU) test for the odds ratio in a 2× 2 contin-
+gency table that satisfies Semi-DP.
+
+• Application and Analysis on Census Data: We apply our Semi-DP framework to con-
+tingency table analysis, which is particularly relevant to the 2020 US Census, demonstrating
+that private outputs can be released while preserving true marginal counts. Furthermore, we
+conduct a detailed privacy analysis of the 2020 US Decennial Census to illustrate the practical
+applicability of our framework in real-world scenarios.
+
+Through these contributions, our work not only generalizes existing DP methods but also pro-
+vides a versatile and practical solution for privacy analysis in scenarios with complex relationships
+between invariants and privatized outputs.
+
+1.3 Paper Organization
+
+In Section 2, we review preliminaries on DP, including adjacency relations, sensitivity space, and key
+mechanisms like Gaussian mechanism and K-norm mechanism. In Section 3, we introduce Semi-
+Differential Privacy (Semi-DP), an extension of differential privacy designed to address the joint
+release of DP outputs and invariant. In Section 4, we develop tailored mechanisms for Semi-DP, such
+as Gaussian mechanism and K-norm mechanisms, focusing on optimizing noise through sensitivity
+space analysis. In Section 5, we apply Semi-DP mechanisms to output a noisy contingency table
+
+3
+
+
+
+Cho and Awan
+
+given the one-way margins as invariant. In Section 6, we provide a privacy analysis on 2020 US
+Census based on our Semi-DP framework. Finally, in Section 7, we conclude this paper with some
+discussion. We relegate all the proofs to Appendix A.
+
+2. Preliminaries on Differential Privacy
+
+In this section, we review the fundamental concepts of DP, focusing on the notions of adjacency
+and the role of hypothesis testing in quantifying privacy protection. We also discuss key properties
+such as group privacy, composition, and post-processing invariance. Additionally, we introduce the
+concept of sensitivity space and its significance in guiding mechanism design, particularly in the
+context of adding noise to queries to ensure DP.
+
+2.1 Adjacency in Differential Privacy
+
+DP relies on an adjacency relation on databases, which quantifies whether two databases are “dif-
+fering in one entry.” Adjacency is crucial because DP requires that the outputs generated from two
+adjacent datasets to be similar. In many DP applications, adjacency is defined in terms of a metric
+on a given dataspace. A common example is when the input is tabular data, and the Hamming
+distance is used. If the size of the tabular data is known to be n, the dataspace is D = X n, where
+each individual contribution is denoted by X . The adjacency relation is then defined using the
+Hamming distance as A(X,X ′) = 1{H(X,X′)=1}.
+
+Unlike traditional DP, our approach focuses on a subset of the entire dataspace, specifically the
+invariant-conforming databases that share the same invariant values as the confidential data. Since
+we define adjacency only among these databases, it is helpful to outline the distance metrics we
+will consider for this purpose.
+
+Definition 1 Let D be a dataspace and consider a metric d : D ×D → Z≥0. Define an adjacency
+function A(X,X ′) : D × D → {0, 1} by A(X,X ′) = 1{d(X,X′)=1}. We say that a metric d is
+an adjacency metric if d(X,X ′) = a is equivalent to the existence of a sequence of databases
+X0 = X,X1, . . . , Xa = X ′ such that A(Xi−1, Xi) = 1 for all i ∈ [a], and a is the smallest value for
+which this is possible.
+
+Example 1 Most widely accepted metrics in DP literature indeed are adjacent metrics: For Ham-
+ming distance H defined on dataspace X n, H(X,X ′) represents the number of different entries be-
+tween two datasets having the same total number of entries. Then for X,X ′ such that H(X,X ′) = a,
+there exists a sequence of datasets X0 = X,X1, . . . , Xa = X ′, where for each pair Xi−1 and
+Xi, Xi can be obtained by switching an entry in Xi−1 to some other entry, and so satisfying
+A(Xi−1, Xi) = 1. This sequence confirms that the Hamming distance is an adjacency metric.
+
+On the other hand, when the total number of rows is not known, it is usual to consider the
+dataspace to be D =
+
+⋃∞
+i=0X i. The adjacency relation in this case is typically defined as A(X,X ′) =
+
+1{X∆X′=1}, where X∆X ′ represents the symmetric difference between two datasets. The criterion
+here is whether one dataset can be obtained from the other by adding or removing a single entry.
+In this case, X∆X ′ = a indicates that X ′ can be obtained by adding/deleting a total of a rows from
+X. We see that the symmetric difference distance is also an adjacency metric.
+
+Remark 2 In DP, the adjacency relation is typically defined between databases that differ by a
+distance of 1, capturing the idea that they vary by only a single entry. The focus on such adjacent
+databases enables the interpretation of DP as providing individual-level protection. This individual-
+level protection enhances the interpretability of DP, allowing both the data curator deploying the
+
+4
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+DP mechanism and the individuals whose data is included to clearly understand what aspects of
+their data are being protected. In this paper, we will design an adjacency function for Semi-DP
+with the same goal of individual-level interpretability as well.
+
+2.2 Differential Privacy via Hypothesis Testing
+
+Once adjacency is understood, we can explore the privacy protection provided by DP. Over time,
+various DP variants have introduced different methods for quantifying similarity between distribu-
+tions, such as likelihood ratios (Dwork, 2006), Rényi divergence (Bun and Steinke, 2016; Mironov,
+2017), and hypothesis testing (Dong et al., 2022). Hypothesis testing, in particular, is a powerful
+tool for understanding DP, where the objective of the adversary is to distinguish between two ad-
+jacent input datasets, X and X ′. The quantification of privacy protection relies on bounding the
+type I and type II errors of the most powerful test for this hypothesis. In Dong et al. (2022), the
+tradeoff function T (P,Q) : [0, 1] → [0, 1] between distributions P and Q is introduced, defined as
+T (P,Q)(α) = inf{1− EQϕ : EP (ϕ) ≤ 1− α}, where the infimum is taken over all measurable tests
+ϕ.1 It provides the optimal type II error for testing H0 = P versus H1 = Q at type I error 1− α,
+thereby capturing the difficulty of distinguishing between P and Q.
+
+Definition 3 (f -DP: Dong et al. (2022)) Let D be a dataspace, A : D×D → {0, 1} be an adjacency
+function, and f be a tradeoff function. A mechanism M(X) is (D, A, f)-DP if
+
+T (M(X),M(X ′)) ≥ f,
+
+for all X,X ′ ∈ D such that A(X,X ′) = 1.
+
+In Definition 3, we explicitly include the underlying dataspace and adjacency function, unlike
+the typical expression that focuses solely on the tradeoff function f as the privacy parameter. This
+is because our framework will account for a invariants and specifically considers adjacent databases
+among invariant-conforming databases. Therefore, it is essential to explicitly define the dataspace
+and adjacency function to accurately capture the privacy guarantee in our framework.
+
+Intuitively speaking, a mechanism M(X) satisfies f -DP, where f = T (P,Q), if testing H0 : X
+versus H1 : X ′ is at least as difficult as testing H0 : P versus H1 : Q. The tradeoff function f
+serves as the privacy parameter, guiding the level of privacy protection. Without loss of generality
+we can assume f is symmetric, meaning that if f = T (P,Q), then f = T (Q,P ). This is due to the
+fact that adjacency of databases is a symmetric relation (Dong et al., 2022). Moreover, a function
+f : [0, 1] → [0, 1] is a tradeoff function if and only if f is convex, continuous, non-decreasing, and
+f(x) ≤ x for all x ∈ [0, 1]. We say that a tradeoff function f is nontrivial if f(α) < α for some
+α ∈ (0, 1).
+
+Two important special cases of f -DP are (D, A, fϵ,δ) and (D, A,Gµ), which correspond to (ϵ, δ)-
+DP and µ-Gaussian DP(GDP), respectively. For ϵ ≥ 0 and δ ∈ [0, 1], we define fϵ,δ(α) = max{0, 1−
+δ − eϵ + eϵα, e−ϵ(α − δ)}, and for µ ≥ 0, we define Gµ = T (N(0, 1), N(µ, 1)). Moreover, a lossless
+conversion from (D, A,Gµ)-DP to a family of (D, A, fϵ,δ)-DP guarantees was developed in Balle
+and Wang (2018): a mechanism is (D, A,Gµ)-DP if and only if it is (D, A, fϵ,δ(ϵ))-DP for all ϵ ≥ 0,
+
+where δ(ϵ) = Φ
+(
+− ϵ
+
+µ + µ
+2
+
+)
+− eϵΦ
+
+(
+− ϵ
+
+µ − µ
+2
+
+)
+.
+
+DP has the following three properties:
+
+1. The tradeoff function in Dong et al. (2022) was initially defined as the smallest type II error given a type I error
+of α. We follow Awan and Dong (2022) and Awan and Ramasethu (2023), who use type I error 1 − α as this
+simplifies the formula for group privacy.
+
+5
+
+
+
+Cho and Awan
+
+Group Privacy: Group privacy addresses the protection of privacy when a group of size k in
+a database is replaced by another group of the same size. When using an adjacency metric d,
+group privacy concerns data pairs where d(X,X ′) ≤ k. Representing this through the adjacency
+function, we define Ak(X,X
+
+′) = 1{d(X,X′)≤k} to capture the indistinguishability between X and X ′
+
+under these conditions. Additionally, the level of privacy protection diminishes as the group size
+k increases. In particular, for a mechanism M that satisfies (D, A1, f)-DP, it satisfies (D, Ak, f
+
+◦k)-
+DP, where f◦k represents the functional composition of f applied k times. In the case of GDP,
+there is a particularly convenient formula: a mechanism M that satisfies (D, A1, Gµ)-DP satisfies
+(D, Ak, Gkµ)-DP.
+
+Composition: The f -DP framework can quantify the cumulative privacy cost for the sequential
+release of multiple DP outputs. To model this process, let M1 : D → Y1 be the first mechanism
+applied to a dataset X, and define Y1 = M1(X). The output Y1 then serves as an input to a
+second mechanism M2 : D × Y1 → Y2, which generates Y2 = M2(X, y1). This recursive process
+continues for m mechanisms, such that the i-th mechanism Mi : D×Y1× · · · ×Yi−1 → Yi produces
+Yi =Mi(X,Y1, . . . , Yi−1). Thus, the m-fold composed mechanism M : D → Y1×· · ·×Ym is defined
+as M(X) = (Y1, Y2, . . . , Ym), where each Mi satisfies (D, A, fi)-DP. The entire composition M(X)
+satisfies (D, A, f1 ⊗ · · · ⊗ fm)-DP, where ⊗ denotes the tensor product of the tradeoff functions.
+Specifically, if f = T (P1, Q1) and g = T (P2, Q2), then f ⊗ g = T (P1 × P2, Q1 × Q2), quantifying
+the overall privacy guarantee for the composed mechanism.
+
+Invariance to Post-Processing: Additional data-independent transformations on the DP output
+does not weaken the DP guarantee. Formally, if M : D → Y is (D, A, f)-DP and Proc : Y → Z a
+(possibly randomized) function, Proc(M(X)) : D → Z is also (D, A, f)-DP.
+
+2.3 Mechanism Design
+
+The most widely used approach to achieve DP is to add independent noise to a query. To make it
+difficult to distinguish two adjacent input databases, the additive noise should be large enough to
+mask a difference in the query due to adjacent databases. To this end, the key tool for calibrating
+the noise is the sensitivity space and sensitivity.
+
+Definition 4 (Sensitivity Space: Awan and Slavković (2021)) Let ϕ : D → Rd be any function.
+The sensitivity space of ϕ with respect to adjacency function A is
+
+SA
+ϕ =
+
+{
+ϕ(X)− ϕ(X ′) : A(X,X ′) = 1 where X,X ′ ∈ D
+
+}
+. (1)
+
+When it is clear from the context, we may omit the super- and subscripts of S.
+
+The sensitivity space in Definition 4 refers to the set of all possible differences in query outputs
+resulting from changing a dataset to an adjacent counterpart. It helps quantify the maximum
+deviation that adjacent datasets can have on the query, thereby guiding the amount of noise needed
+to ensure privacy.
+
+Definition 5 (K-norm Sensitivity: Awan and Slavković (2021)). For a norm ∥ · ∥K , whose unit
+ball is K = {x : ∥x∥K ≤ 1}, the K-norm sensitivity of ϕ with respect to adjacency function A
+is ∆K(ϕ;A) = supu∈SA
+
+ϕ
+∥u∥K . For p ∈ [1,∞], the lp-sensitivity of ϕ is ∆p(ϕ;A) = supu∈SA
+
+ϕ
+∥u∥p.
+
+When it is clear from the context, we may omit the specification of A and simply write ∆K(ϕ) or
+∆p(ϕ).
+
+6
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+The sensitivity of ϕ, geometrically, corresponds to the largest radius of SA
+ϕ , measured by the
+
+norm of interest, indicating the maximum change in ϕ due to adjacent databases (Awan and
+Slavković, 2021). Gaussian additive noise proportional to ℓ2-sensitivity leads to µ-GDP, while the
+Laplace additive noise calibrated by ℓ1-sensitivity satisfies ϵ-DP. Moreover, a multivariate extension
+of the Laplace mechanism are the K-norm mechanisms, which substitutes the ℓ1-norm with another
+norm.
+
+Proposition 6 (Gaussian Mechanism:Dong et al. (2022)). Define the Gaussian mechanism that
+operates on a query ϕ as M(X) = ϕ(X)+ξ, where ξ ∼ N(0, σId) for some σ ≥ µ−1∆2(ϕ;A). Then
+M is (D, A,Gµ)-DP.
+
+Proposition 7 (K-Norm Mechanism: Hardt and Talwar (2010)). Let ∥ · ∥K be any norm on Rd
+
+and let K = {x : ∥x∥K ≤ 1} be its unit ball. Let ∆K(ϕ;A) =
+∑
+
+u∈SA
+ϕ
+∥u∥K . Let V be a random
+
+variable in Rd, with density fV (v) =
+exp( ϵ
+
+∆
+∥v∥K)
+
+Γ(d+1)λ(∆
+ϵ )
+
+, where ∆K(ϕ;A) ≤ ∆ < ∞. Then releasing
+
+ϕ(X) + V satisfies (D, A, fϵ,0)-DP.
+
+Awan and Slavković (2021) proposed a criteria to compare K-norm mechanisms:
+
+Definition 8 (Containment Order and Optimal K-norm mechanism (Awan and Slavković, 2021)).
+
+Let V and W be two random variables on Rd with densities fV (v) = c exp
+(
+− ϵ
+
+∆K
+∥v∥K
+
+)
+and
+
+fW (w) = c exp
+(
+− ϵ
+
+∆H
+∥w∥H
+
+)
+. We say that V is preferred over W in the containment order if
+
+∆K ·K ⊂ ∆H ·H.
+
+Moreover, We define the optimal K-norm mechanism as one that adds noise from a random
+
+variable VK with density fVK
+(v) = c exp
+
+(
+− ϵ
+
+∆K
+∥v∥K
+
+)
+, where the norm ball ∆K ·K is the smallest
+
+in containment order among all norm balls that contain the sensitivity space S.
+
+In Awan and Slavković (2021), they showed that if V is preferred over W in the containment
+order, then V has smaller entropy, has smaller conditional variance in any directions, and is stochas-
+tically tighter about its center. They also proved that the optimal K-norm mechanism is based
+on the convex hull of the sensitivity space, provided that the sensitivity space is full-rank, i.e.,
+dim(span(SA
+
+ϕ )) = d. Notably, KA
+ϕ := Hull(SA
+
+ϕ ) is shown to be a norm ball in Rd so that the norm
+∥ · ∥KA
+
+ϕ
+is well-defined the corresponding K-norm mechanism is optimal.
+
+Proposition 9 (Optimal K-norm mechanism for full-rank sensitivity space (Awan and Slavković,
+2021)). Let ϕ : D → Rd such that SA
+
+ϕ is bounded and span(SA
+ϕ ) = Rd. Then the K-norm mechanism
+
+using norm ∥·∥KA
+ϕ
+
+and sensitivity ∆K(ϕ;A) = 1 is the optimal K-norm mechanism.
+
+However, given the potential violation of the full-rank condition due to invariants, we extend
+their findings in Section 4.2 to provide the optimal K-norm mechanism applicable to rank-deficient
+sensitivity spaces, where dim(span(Sϕ)) < d.
+
+3. Semi Differential Privacy
+
+This section introduces the Semi Differential Privacy (Semi-DP) framework, which extends tradi-
+tional DP concepts to scenarios where invariants are jointly published with DP outputs. We start
+by demonstrating how an invariant can compromise standard DP protections, and explain how
+
+7
+
+
+
+Cho and Awan
+
+altering the set of adjacent databases results in adjusted privacy parameters. We contrast our ap-
+proach with Subspace DP, highlighting its limitations in practical privacy contexts. Our framework
+focuses on preserving individual-level protection within invariant-conforming databases, ensuring a
+meaningful and interpretable privacy guarantee aligned with the core philosophy of DP.
+
+3.1 Challenges of Preserving DP with Invariants
+
+To illustrate how the joint publication of an invariant can undermine privacy protection by the DP
+framework, we consider a simple example.
+
+Example 2 Suppose D = {(x1, x2, x3) : xi ∈ {0, 1}, for all i = 1, 2, 3} and the true confidential
+data is X∗ = (0, 1, 1). While a data curator wants to publish M(X) which is a differentially private
+version of a query ϕ(X), assume that the curator also wants to publish T (X) = #{i|xi = 1} as
+well. In this case, the invariant is t = T (X∗) = 2.
+
+Without the invariant, DP protects any two databases differing in one entry. However, given the
+invariant t = 2, an adversary would rule out all the databases that do not give the same invariant
+value and determine that there are only three databases which satisfy T (X) = 2: (1, 1, 0), (1, 0, 1),
+and (0, 1, 1). Consequently, a privacy guarantee is only possible for these invariant-conforming
+databases. However, since the Hamming distance between any pair of the remaining databases is
+2, the privacy parameter should be modified as we have seen for group privacy. In other words, the
+presence of the invariant alters both the pairs protected by DP and the extent of that protection.
+
+Example 2 presents two key takeaways. The first is that a DP-style guarantee is only possible
+for invariant-conforming databases. From the adversary’s standpoint, if true information about
+the confidential data is provided by an invariant t, the adversary would naturally aim to exploit t
+to its fullest extent. As a result, the adversary will immediately restrict their focus to invariant-
+conforming databases that align with t, considering them the only possible true input databases.
+Therefore, regardless of the DP mechanism used for the query, this narrowing of candidates due to
+the provided invariant is inevitable.
+
+Secondly, within invariant-conforming databases, the distance of 1 can no longer serve as the
+standard for adjacent relations. In the case of Example 2, the Hamming distance among the
+remaining three databases is 2 for every pair. Therefore, it is necessary to redefine adjacency
+among invariant-conforming databases in order to give a meaningful DP guarantee.
+
+3.2 Limitations of Subspace DP
+
+In this section, we investigate subspace DP introduced in Gao et al. (2022) to highlight why focusing
+on invariant-conforming databases is crucial and necessary for privacy protection. The core issue of
+subspace DP is that it considers all adjacent databases—even those do not agree with the invariant.
+Note that the invariant in their consideration is a linear transformation of ϕ(X), or Cϕ(X) for some
+matrix C. Subspace DP can be expressed in f - DP terminology, rather than (ϵ, δ)-DP in the original
+paper as follows:
+
+Definition 10 (Subspace Differential Privacy (Gao et al., 2022)). Let d be an adjacency metric
+and f be a tradeoff function. Consider a query ϕ : D → Rd and let T (X) = Cϕ(X) be a linear
+invariant for some C. A mechanism M whose codomain is Rd satisfies f -subspace differential
+privacy if, for any X,X ′ ∈ D such that d(X,X ′) ≤ 1,
+
+T
+(
+Proj⊥C M(X),Proj⊥C M(X ′)
+
+)
+≥ f,
+
+8
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+where C = span(Sϕ) is the span of the sensitivity space and Proj⊥C is the projection operator that
+projects onto the orthogonal complement of C.
+
+Therefore, subspace DP considers noisy versions of ϕ(X) and only measures the closeness of
+outputs within the space where ϕ(X) is not already determined by the invariant T (X) = Cϕ(X).
+At a glance, this seems like a reasonable choice. If there are parts of ϕ(X) that T (X) discloses
+without noise, there is no way to protect these overlapping parts regardless of any perturbation
+applied to ϕ(X). Therefore, the effort is directed towards protecting only the remaining parts that
+are not exposed. Additionally, by not adding noise to the parts that cannot be protected anyway,
+the total amount of noise introduced into the overall mechanism can be reduced, improving utility.
+
+However, subspace DP cannot serve as a meaningful measure of privacy protection as it overlooks
+the fact that the adversary can also leverage the invariant T (X∗) = t, where X∗ is the confidential
+data. The similarity in projected outputs does not provide any protection for X∗ and X ′ when
+T (X∗) ̸= T (X ′), as discussed above.
+
+Furthermore, a typical example of a linear transformation is a count statistic and databases
+differing by one entry cannot typically produce the same count statistics. Consequently, subspace
+DP fails to achieve indistinguishability between X and X ′, and so the f parameter cannot be
+properly interpreted. This reinforces the argument to consider invariant-conforming databases
+instead of the original dataspace D.
+
+3.3 Semi Differential Privacy
+
+Based on the previous discussion, we define our dataspace Dt := {X ∈ D : T (X) = t} as the set of
+invariant-conforming databases that share the same invariant value as the confidential data, and
+we characterize a DP-style guarantee on this space. The term “semi-private” was introduced in
+Awan and Vadhan (2023), where it is used to establish upper bounds on the power of differentially
+private testing by weakening the DP constraint. Specifically, in Awan and Vadhan (2023), semi-
+private testing refers to a test function where certain summary statistics of the confidential data are
+not protected, but DP is maintained for databases that share the same summary statistics as the
+confidential data. While we build on the notion of “semi-private” from Awan and Vadhan (2023), we
+extend it to a broader setting by proposing a general DP-style protection for invariant-conforming
+databases in cases where both invariants and DP outputs are jointly released.
+
+First, suppose there exists a mechanismM that satisfies (D, A, f)-DP. We can then characterize
+the privacy protection for the joint release of an output from M and the invariant t as follows:
+
+Proposition 11 (Full Characterization) Given a confidential dataset X∗, let the invariant be
+T (X∗) = t and let M : D → Y be a (D, A, f)-DP mechanism, where an adjacency function
+A : D × D → {0, 1} is defined via an adjacency metric by A(X,X ′) = 1{d(X,X′)≤1}. Consider
+invariant-conforming databases Dt = {X ∈ D : T (X) = t}. Then for any invariant-conforming
+databases X,X ′ ∈ Dt, we have
+
+T
+(
+M(X),M(X ′)
+
+)
+≥ f◦d(X,X′).
+
+Proposition 11 applies to all data pairs and provides a tight lower bound on the trade-off
+function without knowing further details of the privacy mechanism. Proposition 11 follows from
+the observation that M is f -DP if and only if M is f◦d(X,X′) for all X,X ′ ∈ D, given that d is an
+adjacency metric and Dt ⊆ D.
+
+However, it is challenging to understand what this characterization means in practical terms
+and what kind of privacy protection it offers from the perspective of individuals whose data is in
+
+9
+
+
+
+Cho and Awan
+
+the database. In this regard, we introduce our primary framework, semi DP, designed to preserve
+the original spirit of DP while accounting for the presence of invariants.
+
+Definition 12 (f -semi differential privacy). Given a confidential dataset X∗, let the invariant
+be T (X∗) = t and M(X) be a privacy mechanism. For the set of invariant-conforming databases
+Dt = {X ∈ D : T (X) = t}, and given an adjacency function A : Dt × Dt → {0, 1}, a joint release
+of (M(X), T (X)) is said to satisfy f -semi DP if M(X) satisfies (Dt, A, f)-DP. That is,
+
+T (M(X),M(X ′)) ≥ f,
+
+for all X,X ′ ∈ Dt such that A(X,X ′) = 1.
+
+The primary distinction between our definition of f -semi DP and the conventional f -DP in
+Definition 3 lies in its explicit restriction to invariant-conforming database, rather than the original
+dataspace. Thus, Semi-DP guarantees indistinguishability among adjacent databases within the
+restricted dataspace Dt.
+
+To properly define adjacency within this restricted space, we introduce the semi-adjacent pa-
+rameter a(t) and consider an adjacency function of the form Aa(t)(X,X
+
+′) = 1{d(X,X′)≤a(t)} . The
+two most important considerations in defining the semi-adjacent parameter a(t) are: ensuring
+that every X ∈ Dt has an adjacent counterpart X ′, and providing a meaningful interpretation of
+individual-level protection, consistent with the original differential privacy framework.
+
+Definition 13 (Semi-adjacent parameter). Let Dt be a collection of datasets, each consisting of n
+individuals, and let Di
+
+t = {x ∈ X : ∃X ∈ Dt, Xi = x} represent the set of all possible data values
+for individual i across datasets in Dt. Define the semi-adjacent parameter as:
+
+a(t) = sup
+i∈[n]
+
+sup
+x,y∈Di
+
+t
+
+inf{d(X,Y ) : X,Y ∈ Dt, Xi = x, Yi = y},
+
+where d(X,Y ) is an adjacent metric between datasets X and Y .
+
+The semi-adjacent parameter a(t) quantifies the worst-case scenario for replacing an individual
+x in the dataset with another individual y, ensuring that the two resulting databases X and Y
+maintain the same invariant values. Importantly, this is not just about finding any replacement y,
+but identifying the most difficult or “worst-case” replacement. By defining the adjacency function
+as Aa(t)(X,X
+
+′), we ensure that, for each individual x, even the most challenging alternative y is still
+indistinguishable from the perspective of the adversary. This focus on the worst-case replacement
+is crucial for ensuring that privacy holds under the most stringent conditions, consistent with the
+principles of DP.
+
+Remark 14 One may consider other options for the semi-adjacent parameter. It is worth noting
+that the seemingly intuitive choice of amin := minX,X′∈Dt d(X,X
+
+′) is inappropriate. This is because
+a particular confidential dataset X∗ may not have any adjacent counterpart within a distance of
+amin, i.e., {X ∈ Dt | d(X,X∗) ≤ amin} = {X∗}. This situation arises if X∗ is not one of the
+databases achieving amin, rendering amin unsuitable for DP.
+
+Alternatively, one might consider amaxmin(t) := maxX∈Dt minX′∈Dt d(X,X
+′), which reflects the
+
+worst-case scenario by focusing on the maximum distance to the nearest database in Dt. While
+amaxmin ensures that every database has an adjacent counterpart, it lacks a clear interpretation
+regarding individual-level privacy. For example, d(X,X ′) ≤ amaxmin may only allow a record to
+differ in one attribute rather than arbitrarily swapping the record for another.
+
+Therefore, we adopt at as defined in Definition 13, which guarantees that every dataset in Dt has
+an adjacent counterpart while allowing us to reason explicitly about individual privacy protection.
+
+10
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+Example 3 Suppose D = {(x1, x2, x3) : xi ∈ {0, 1}, for all i = 1, 2, 3} and consider T (X) = #{i :
+xi = 1} as defined in Example 2.
+
+If t1 = 2, then the set of invariant-conforming databases is Dt1 = {(1, 1, 0), (1, 0, 1), (0, 1, 1)},
+so Di
+
+t1 = {0, 1} for each i ∈ {1, 2, 3}. The semi-adjacency parameter in this case is a(t1) = 2,
+indicating that two switches in entries are required to transition between any two databases in Dt1
+
+while preserving the invariant.
+
+If t2 = 0, then Dt2 = {(0, 0, 0)}, so Di
+t2 = {0} for each i ∈ {1, 2, 3}. In this case, since there is
+
+only a single database conforming to the invariant t2, the semi-adjacency parameter is a(t2) = 0,
+as there is nothing left to protect.
+
+We conclude this subsection by presenting the result on how the privacy guarantee of a mech-
+anism M(X), which satisfies (D, A1, f)-DP, is affected by the invariant t through the use of the
+semi-adjacent parameter a(t).
+
+Proposition 15 Given a confidential dataset X∗, let the invariant be T (X∗) = t and a(t) be the
+semi-adjacent parameter. Let M : D → Y be a (D, A1, f)-DP mechanism, where an adjacency
+function A : D ×D → {0, 1} is defined via an adjacency metric by A(X,X ′) = 1{d(X,X′)≤1}. Then
+
+M(X) satisfies (Dt, Aa(t), f
+◦a(t))-DP.
+
+Proposition 15 demonstrates that when a mechanismM satisfies (D, A1, f)-DP, the introduction
+of an invariant t modifies the privacy guarantee by restricting attention to invariant-conforming
+databases. Specifically, instead of ensuring indistinguishability between all adjacent databases
+within D at distance 1, the privacy guarantee is on indistinguishability between databases in Dt
+
+that differ by up to a(t), where a(t) is the semi-adjacent parameter. The privacy parameter is
+adjusted from f to f◦a(t), reflecting the privacy loss over the greater distance between adjacent
+databases. As a result, the privacy guarantee is weakened both by reducing the set of protected
+databases and by tightening the privacy parameter.
+
+It is important to note that while this result appears similar to group privacy with group size
+a = a(t), there is a key distinction. In group privacy, the privacy guarantee applies across all the
+pairs of databases differing by up to a entries. However, in this case, the privacy guarantee is limited
+to databases with up to a different entries within Dt. Therefore, even though the privacy guarantee
+in Proposition 15 and group privacy both involve the privacy parameter f◦a, the guarantee in
+Proposition 15 should be understood as weaker than group privacy because it is constrained to
+invariant-conforming databases, rather than applying broadly across all possible databases. This
+idea is captured and formalized later in Definition 20.
+
+Finally, this subsection focused on how the privacy guarantee of a (D, A, f)-DP mechanism M
+changes when an invariant t is introduced. However, it is also possible to design privacy mechanisms
+that account for the invariant from the outset. In Section 4, we will introduce a customized
+mechanism that incorporates the invariant directly into the mechanism design while achieving the
+same Semi-DP guarantee.
+
+3.4 Example on Count Statistics
+
+In this section, we calculate the semi-adjacent parameter a(t) for some examples involving count
+statistics.
+
+For a set of variables {A1, . . . , Ap}, where each variable Aj can take nj distinct levels, consider
+
+a dataset X = (X(1), . . . , X(n)) ∈ X n, where each data point X(i) = (X
+(i)
+1 , . . . , X
+
+(i)
+p ) consists of p
+
+features corresponding to the variables A1, . . . , Ap.
+
+11
+
+
+
+Cho and Awan
+
+For each variable Aj , we define the count statistic Tj(X) as the ordered tuple of the counts of
+each level k ∈ {1, . . . , nj}, given by:
+
+Tj(X) :=
+(
+#{i : X(i)
+
+j = k}
+)nj
+
+k=1
+,
+
+where #{i : X(i)
+j = k} represents the number of data points indexed over i, for which the j-th
+
+feature takes the value k.
+
+To capture the counts of all features in the dataset, we introduce the notation T(X), which
+represents the tuple of count functions for all p features:
+
+T(X) = (T1(X), T2(X), . . . , Tp(X)) ,
+
+where each Tj(X) provides a count of the levels for the corresponding variable Aj .
+
+Example 4 (One-way margins of 2× 2 contingency table). Consider two binary variables A1 and
+A2, where each variable takes values in {1, 2}. Let X = (X(1), . . . , X(n)) be a dataset consisting of
+n data points, and suppose the corresponding contingency table for A1 and A2 is given as follows:
+
+A1\A2 1 2
+
+1 x11 x12
+2 x21 x22
+
+The one-way margins for A1 represent the total counts for each value of A1, which are x11+x12
+and x21 + x22. Similarly, the one-way margins for A2 are given by x11 + x21 and x12 + x22.
+
+In our notation, T(X) = (T1(X), T2(X)), where T1(X) gives the counts of the levels of A1, and
+T2(X) gives the counts of the levels of A2. Specifically, we observe:
+
+T1(X) =
+(
+#{i : X(i)
+
+1 = 1},#{i : X(i)
+1 = 2}
+
+)
+= (x11 + x12, x21 + x22) ,
+
+T2(X) =
+(
+#{i : X(i)
+
+2 = 1},#{i : X(i)
+2 = 2}
+
+)
+= (x11 + x21, x12 + x22) .
+
+Thus, T(X) coincides with the one-way margins of the contingency table, demonstrating that
+the notation captures the count of individual features.
+
+Suppose the invariant is t = T(X∗), where X∗ is the confidential database. Then we have
+bounds for the semi-adjacent parameter a(t) as follows:
+
+Theorem 16 Let X∗ be the confidential database, and let the one-way margins t = T(X∗) be
+the invariant. Consider the Hamming distance as the adjacency metric. Then the semi-adjacent
+parameter a(t) satisfies the following bound:
+
+a(t) ≤ p+ 1.
+
+The upper bound of p+ 1 arises when transforming an individual x into another individual y,
+where all p features differ, and no individual in the dataset shares more than one feature with y.
+Under these conditions, each of the p features requires a distinct replacement operation, leading to
+p replacements. Including the initial replacement of x, this results in a total of p+1 replacements.
+Note that there are cases where a(t) < p+ 1, such as when some of the marginal counts are zero.
+
+12
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+Example 5 (Semi-adjacent parameter given one-way margins of a 2× 2 contingency table).
+
+Consider a 2 × 2 contingency table, where p = 2, so a(t) ≤ 3. To illustrate a scenario where
+a(t) = 3, let x be an individual with feature values A1 = 1 and A2 = 1. Suppose x, observing that the
+one-way margins x21 + x22 and x12 + x22 are nonzero, attempts to pretend to be an individual with
+feature values A1 = 2 and A2 = 2. The worst-case scenario occurs when x22 = 0, meaning there
+are no individuals in the dataset with feature A1 = 2, A2 = 2. Note that for the one-way margins to
+remain nonzero, x21 and x12 must be positive. Thus, we can select an individual with A2 = 2 and
+A1 = 1, and another individual with A1 = 1 and A2 = 1. By replacing these individuals with others
+who also have A1 = 1 and A2 = 1, we can preserve the original counts. Thus, in addition to the
+initial change of x, two further changes are required to maintain the counts, resulting in a(t) = 3.
+The resulting changes in terms of the contingency table can be expressed as x11+1, x12−1, x21−1,
+and x22 + 1.
+
+Remark 17 An interesting extension of our result arises when more detailed counts are to be
+released instead of the marginal counts for each of the p features A1, . . . , Ap. For example, consider
+a dataset of college students where A1 represents gender, A2 represents major, and A3 represents
+state of residence. In the case of T(X), marginal counts for gender, major, and state would be
+published separately. However, a data curator may wish to release joint counts for gender and
+major, which correspond to counts such as (male, statistics major), (female, statistics major),
+(male, CS major), (female, CS major), and so on. This provides more detailed information than
+marginal counts alone. Conceptually, we can view this as combining A1 and A2 into a single
+feature A1 ×A2, effectively reducing the number of features to p− 1. According to Theorem 16, the
+semi-adjacent parameter a(t) would then be bounded by p.
+
+At first, this might seem counterintuitive: publishing more detailed information results in a
+smaller a(t). However, the key observation is that as more detailed information is released, the set
+of datasets consistent with the invariant becomes smaller. This reduction effectively constrains the
+set of potential replacements for an individual x with another individual y. As a result, the number
+of viable y values to consider when evaluating the semi-adjacent parameter a(t) decreases. Since the
+supremum over x, y ∈ Di
+
+t is taken over a smaller set, the upper bound of a(t) naturally decreases.
+
+When the counts for every level in A1×· · ·×Ap are published, x must select one of the non-zero
+count feature combinations and wishes to pretend to be an individual y with those feature values.
+Since there is guaranteed to be an individual in the dataset with the chosen feature combination,
+changing that individual to one with x’s original feature values preserves the counts. As a result,
+only two replacements are required.
+
+Thus, as more detailed information is published, the selection of a plausible y becomes more con-
+strained, leading to the somewhat surprising but logical result that the upper bound of a(t) decreases.
+Note that in the extreme case where t reveals the entire dataset, we have a(t) = 0.
+
+Finally, we have the following privacy guarantee for a joint release of such invariant t and a DP
+mechanism:
+
+Corollary 18 Given a confidential database X∗ that consists of p features, let the invariant be
+t = T(X∗) and M be a pivacy mechansim that satisfies (D, A1, f)-DP. Then the joint release
+(M(X), t) satisfies (Dt, Aa(t), f
+
+◦(p+1))-DP.
+
+Corollary 18 is immediate from Theorem 16, Proposition 15, and the fact that f◦(p+1) ≤ f◦a(t),
+which is because a(t) ≤ p+ 1 and f(x) ≤ x.
+
+13
+
+
+
+Cho and Awan
+
+3.5 Comparison Between Semi-DP Guarantees
+
+In our Semi-DP framework, comparing guarantees is inherently more challenging than in standard
+DP. For standard DP, comparisons are simplified because the guarantees share a common underlying
+dataspace and adjacency function, making it sufficient to compare the privacy parameters alone.
+However, in Semi-DP, the underlying dataspace and corresponding adjacency function vary based
+on the invariant t. Therefore, relying solely on privacy parameters for comparison can be misleading.
+
+Example 6 (Comparing group privacy and Semi-DP). To illustrate the case where merely com-
+paring privacy parameters could be misleading, consider a (D, A, f)-DP mechanism M(X) and
+invariant t and suppose a(t) = a. On one hand, M(X) satisfies (D, Aa, f
+
+◦a)-DP as the group pri-
+vacy of size a. On the other hand, in Dt, for X,X
+
+′ ∈ Dt such that Aa(X,X
+′) = 1, their tradeoff
+
+function has a lower bound as f◦a by Proposition 11, leading to (Dt, Aa, f
+◦a)-DP, or f◦a-semi DP.
+
+If we only compare privacy parameters, the two privacy guarantees should have the same level of
+protection. However, this is incorrect. Group privacy quantifies the indistinguishability for all data
+pairs in the dataspace with a size difference of a, while Semi-DP quantifies the indistinguishability
+for some data pairs in the D with a size difference of a. Roughly speaking, some data pairs protected
+under group privacy are not protected under Semi-DP.
+
+To better understand what pairs of databases are protected, we define the “indistinguishable
+pairs” of a privacy guarantee.
+
+Definition 19 (Indistinguishable pairs). Given an underlying dataspace D and an adjacency func-
+tion A : D×D → {0, 1}, we define the indistinguishable pairs as the collection of pairs of databases
+which are adjacent:
+
+IND(D, A) = {(X,X ′) ∈ D ×D : A(X,X ′) = 1}.
+
+Note that Definition 19 outlines the pairs of databases that can be protected by a given privacy
+guarantee, effectively defining the scope of the privacy protection. For example, a standard DP
+mechanism always has IND(D, A1) since all adjacent databases are of interest. On the other hand,
+for group privacy of size a, the corresponding IND is IND(D, Aa) because group privacy targets
+indistinguishability between any databases with a size difference of a. However, in Semi-DP, the
+IND changes depending on invariant.
+
+Definition 20 Consider two DP guarantees, (D, A, f)-DP and (D′, A′, g)-DP. We define a partial
+order ⪯ between these guarantees as follows:
+
+(D′, A′, g)-DP ⪯ (D, A, f)-DP if:
+
+1. IND(D′, A′) ⊆ IND(D, A) and
+2. g ≤ f.
+
+We say that (D, A, f)-DP is a stronger privacy guarantee than (D′, A′, g)-DP if
+
+(D′, A′, g)-DP ⪯ (D, A, f)-DP.
+
+Furthermore, we define (D′, A′, g)-DP ≺ (D, A, f)-DP if one of the following conditions holds:
+
+1. IND(D′, A′) ⊆ IND(D, A) and g < f, or
+
+2. IND(D′, A′) ⊂ IND(D, A) and g ≤ f.
+
+14
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+In this definition, the partial order ⪯ allows us to compare DP guarantees based on their
+indistinguishable pairs and tradeoff functions, while the strict partial order ≺ indicates that one
+guarantee is strictly stronger if it improves on one of the criteria while not being weaker in the
+other.
+
+Definition 20 highlights the importance of considering both the indistinguishable pairs and the
+privacy parameter to evaluate a privacy guarantee. Recall Example 6, which compares (D, Aa, f
+
+◦a)-
+DP and (Dt, Aa, f
+
+◦a)-DP. Although they share the same lower bound on the tradeoff function f◦a,
+we have IND(Dt, Aa) ⊆ IND(D, Aa), implying (Dt, Aa, f
+
+◦a)-DP ⪯ (D, Aa, f
+◦a)-DP.
+
+3.6 Properties of Semi-DP
+
+The Semi-DP framework retains many characteristics of DP within the restricted dataspace.
+
+Composition: When a data curator considers a joint release of composition among DPmechanisms
+and invariants, there are two options in analyzing the privacy guarantee: calculate Semi-DP first
+and then apply composition (Semi-DP first), or applying composition and then calculating Semi-
+DP (composition first). Theorem 21 tells us that employing Semi-DP first offers a stronger privacy
+guarantee.
+
+Proposition 21 Suppose Mi : D → Y satisfies (D, A1, fi)-DP for all i ∈ [k]. Let a(t) be the semi-
+adjacent parameter given the invariant t. Then Semi-DP first satisfies (Dt, Aa(t), f
+
+◦a
+1 ⊗· · ·⊗f◦ak )-DP
+
+and Composition first satisfies (Dt, Aa(t), (f1 ⊗ · · · ⊗ fk)
+◦a)-DP.
+
+Moreover, (Dt, Aa(t), (f1 ⊗ · · · ⊗ fk)
+◦a)-DP ⪯ (Dt, Aa(t), f
+
+◦a
+1 ⊗ · · · ⊗ f◦ak )-DP.
+
+Note that both approaches share the same indistinguishable pairs. Therefore, comparison be-
+tween the two privacy guarantees depends only on the tradeoff function. We establish that the
+tradeoff function for Semi-DP has a lower bound of f◦a1 ⊗ · · · ⊗ f◦ak , while the Composition ap-
+proach yields (f1 ⊗ · · · ⊗ fk)
+
+◦a. Using the result from Awan and Dong (2022) that we present as
+Lemma 41 in the Appendix, we have that (f1 ⊗ · · · ⊗ fk)
+
+◦a is the smaller function. Therefore,
+Theorem 21 implies that Semi-DP first provides a stronger privacy guarantee.
+
+Remark 22 The composition of k Semi-DP mechanisms ((M1(X), T1(X)), · · · , (Mk(X), Tk(X)))
+can be addressed by Theorem 21 by taking T (X) = (T1(X), · · · , Tk(X)). On the other hand, we do
+not have an efficient method to sequentially update the impact due to invariant.
+
+Invariance to Post-Processing: Similar to DP, in Semi-DP, applying further data-independent
+transformations to the mechanism’s output will not weaken the privacy guarantee. Note that in
+Semi-DP, the transformation may depend on the invariant.
+
+Proposition 23 Suppose M(X) is (Dt, A, f)-DP, and let Proc be a randomized function taking
+as input the output of M(X) and the invariant t. Then for any pair of databases X,X ′ ∈ Dt such
+that A(X,X ′) = 1, we have
+
+T (Proc(M(X), t),Proc(M(X ′)), t) ≥ f.
+
+Converting to Other DP Guarantees: In Section 2, we discussed the conversion between
+µ-GDP and (ϵ, δ)-DP. Since our Semi-DP framework relies on the same similarity measures as
+in existing DP definitions while focusing on the dataspace and adjacency relations influenced by
+invariants, all conversions valid in standard DP should remain applicable in our framework. For
+example, f -DP can be converted to divergence-based version DP, such as Rényi-DP (Mironov,
+2017).
+
+15
+
+
+
+Cho and Awan
+
+4. Mechanism Design
+
+In this section, we introduce customized mechanisms which leverage the invariant in their construc-
+tion in order to minimize the amount of noise added to achieve Semi-DP. To this end, we leverage
+the sensitivity space, which is a fundamental tool in additive mechanisms. Specifically we develop
+the optimal K-norm mechanism in Semi-DP.
+
+4.1 Mechanism Design via Analysis on Sensitivity Space
+
+If Semi-DP is the target privacy guarantee, we can optimize the choice of the mechanismM and any
+post-processing to leverage the invariant t. By incorporating t, it is possible to reduce unnecessary
+noise while still satisfying the target privacy guarantee.
+
+Recall that the sensitivity space, as defined in Definition 4, encompasses all possible differences
+in a query ϕ : D → Rd between adjacent databases. The additive noise is scaled according to the
+sensitivity of ϕ, which is the largest radius of this sensitivity spaceto mask the impact of differences
+in adjacent input databases.
+
+In Semi-DP given invariant t and target privacy guarantee (Dt, Aa(t), f), the sensitivity space
+of ϕ is
+
+SSemi = {ϕ(X)− ϕ(X ′) : Aa(t)(X,X
+′) = 1}.
+
+Using the Semi-DP sensitivity space, we can seamlessly apply many existing DP methods.
+This encompasses traditional mechanisms like the Gaussian and Laplace mechanisms, as well as
+more advanced methods such as DP-empirical risk minimization (Chaudhuri et al., 2011) and
+DP-stochastic gradient descent (Abadi et al., 2016). Consequently, our framework supports the
+flexible application of established DP tools, distinguishing itself from prior work (Gong and Meng,
+2020; Gao et al., 2022), which focused solely on invariants which are linear transformations and
+mechanisms of a particular structure.
+
+While the idea of using SSemi is simple, it is also highly effective. This effectiveness becomes
+evident when compared to other naive approaches. A straightforward method for designing a
+mechanism that satisfies (Dt, Aa(t), f)-DP is to first construct a mechanism that satisfies (D, A1, g)-
+DP, where g◦a ≥ f . By leveraging group privacy, this mechanism would then satisfy (D, Aa, f)-DP,
+and consequently (Dt, Aa(t), f)-DP as well. Another naive approach would be to directly design
+a mechanism that satisfies (D, Aa, f)-DP, that is group privacy of size a with privacy parameter
+f , which then automatically satisfies (Dt, Aa(t), f)-DP. However, neither of thses approaches fully
+leverages the information in t.
+
+To further illustrate the advantage of leveraging SSemi from the perspective of the sensitivity
+space, let us consider the Gaussian mechanism that satisfies µ-GDP. In the first naive approach, we
+use the sensitivity calculated from SDP := {ϕ(X)− ϕ(X ′) : A1(X,X
+
+′) = 1} to construct a mecha-
+nism that satisfies (D, A1, Gµ/a)-DP. According to the Gaussian mechanism described in Proposition
+6, substituting µ with µ/a adjusts the variance of the noisy Gaussian noise to σ ≥a∆2/µ. Thus,
+the first method can be interpreted as calibrating noise using an enlarged sensitivity space aSDP ,
+effectively scaling the original SDP by a. On the other hand, the second approach directly targets
+indistinguishability for all pairs within distance a in the dataspace, leading to a sensitivity space
+defined as SGroup := {ϕ(X) − ϕ(X ′) : Aa(X,X
+
+′) = 1}. Comparing SSemi with aSDP and SGroup,
+we the following:
+
+Proposition 24 For SDP , SGroup and SSemi, we have
+
+SSemi ⊆ SGroup and Hull(SGroup) ⊆ aHull(SDP ).
+
+Moreover, supu∈SSemi
+∥u∥ ≤ supu∈SGroup
+
+∥u∥ ≤ a supu∈SDP
+∥u∥, for any norm ∥ · ∥.
+
+16
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+According to Proposition 24, we conclude that SSemi allows smaller noise than using other naive
+counterparts. This is because SSemi requires masking only the differences that occur between pairs
+we target to protect, instead of considering differences across all pairs, including those that cannot
+be protected due to the given invariant t.
+
+Downsizing the Noise by Projection: We propose a method to reduce the additive noise when
+the sensitivity space is rank-deficient, meaning rank(span(S)) < d. A typical example occurs when
+the invariant t is a linear transformation of the query ϕ, as considered in Gao et al. (2022).
+
+Proposition 25 Suppose the invariant t is a non-trivial linear transformation of ϕ(X), meaning
+t = Lϕ(X) for some matrix L such that ker(L) ̸= D, and the semi-adjacent parameter a(t) is given.
+Then, the sensitivity space SSemi = {ϕ(X) − ϕ(X ′) : Aa(t)(X,X
+
+′) = 1 and Lϕ(X) = Lϕ(X ′)} is
+rank-deficient.
+
+In such cases, we do not need to add noise in these negligible directions as adjacent databases
+yield identical values, and so they provide no clues to the adversary for distinguishing between
+the adjacent databases. By projecting the noise onto the subspace where the query value actually
+changes, we can avoid adding noise to such directions, leading to the same privacy guarantee with
+smaller noise.
+
+Proposition 26 (Projection to Downsize Additive Noise) Let ϕ : D → Rd be a query, and suppose
+the mechanism M(X) = ϕ(X) + e satisfies (D, A, f)-DP, where e is a random vector. Then, a
+mechanism ϕ(X) + ProjS e also satisfies (D, A, f)-DP, where S = span(Sϕ) is the span of the
+sensitivity space and ProjS is the orthogonal projection operator onto S.
+
+In Proposition 26, if the original noise e perturbs all d dimensions in which the query takes
+values, then ProjS e serves to add noise only in the directions where changes occur between adjacent
+databases. This ensures that noise is applied effectively, targeting only the relevant dimensions
+influenced by the data change. Indeed, it follows from standard linear algebra that∥ProjS e∥ ≤ ∥e∥
+for any norm, as projecting onto a subspace cannot increase the norm, where the strong inequality
+holds when S is rank-deficient. Therefore, Proposition 26 helps us to downsize the noise.
+
+Remark 27 Proposition 26 is especially useful when the invariant is a linear transformation of the
+query ϕ. For instance, the 2020 US Census has invariant T (X) as a linear mapping of true counts
+on demographics ϕ(X), say T (X) = Cϕ(X) for some matrix C. Then T (X) = t allows us not
+to add noise onto subspace span (C) and in this case, it agrees with the mechanism design in Gao
+et al. (2022) for subspce DP. Note that a similar projection idea was introduced in Kim et al. (2022)
+for general queries, but without considering invariants, and with a specific focus on the Gaussian
+mechanism. However, we emphasize that Theorem 26 presents a general concept applicable to all
+additive noise mechanisms.
+
+We introduce a modified Gaussian mechanism that satisfies (Dt, Aa(t), Gµ)-DP by leveraging
+the sensitivity space SSemi and applying the projection technique outlined in Proposition 26.
+
+Algorithm 1 outlines the Gaussian mechanism. The noise N in Algorithm 1 can equivalently
+be understood as the result of sampling from Nd(0, (∆2(SSemi)/µ)
+
+2Id) and then projecting onto
+span(SSemi). In this context, the projection matrix P projects vectors from the ambient space Rd
+
+onto the subspace span(SSemi). It indicates that P effectively reduces the variance of the noise
+by confining it to the subspace span(SSemi). Notably, if {u1, · · · , us} is an orthonormal basis of
+span(SSemi), where s ≤ d, the projection matrix P can be constructed as P =
+
+∑s
+i=1 uiu
+
+⊤
+i .
+
+Proposition 28 establishes the privacy guarantee of the Gaussian mechanism.
+
+17
+
+
+
+Cho and Awan
+
+Algorithm 1 Gaussian Mechanism
+
+1: Input: Query ϕ : D → Rd to be privatized, invariant t, privacy parameter µ
+2: Get SSemi = {ϕ(X)− ϕ(X ′) : Aa(t)(X,X
+
+′) = 1}
+3: Define P as an orthogonal projection matrix onto span (SSemi)
+4: Calculate ℓ2-sensitivity ∆2(SSemi) = supu∈SSemi
+
+∥u∥2
+5: Sample N ∼ Nd
+
+(
+0, (∆2(SSemi)/µ)
+
+2P
+)
+
+6: Output: M(X) = ϕ(X) +N
+
+Proposition 28 The mechanism M(X) in Algorithm 1 satisfies (Dt, Aa(t), Gµ)-DP.
+
+4.2 Optimal K-Norm Mechanism
+
+K-norm mechanisms are a multi-dimensional extension of the Laplace mechanism that satisfy ϵ-
+DP, or equivalently, fϵ,0-DP. Unlike the Gaussian mechanism, one has the freedom to customize the
+norm. In Awan and Slavković (2021), they proved that a norm ball K which is the convex hull of
+the sensitivity space leads to the optimal K-norm mechanism, given that the underlying sensitivity
+space is of full-rank.
+
+However, the introduction of an invariant t can make the sensitivity space rank-deficient, ren-
+dering their strategy no longer valid as the convex hull of a rank-deficient sensitivity space is not
+guaranteed to be a norm ball in Rd as it is not of full dimension. To address this, we consider the
+convex hull of the sensitivity space in the subspace spanned by the sensitivity space, where the
+convex hull becomes a valid norm ball.
+
+Lemma 29 Let K = Hull(S) be the convex hull of S. Then K is a norm ball in S = span(S),
+provided that the sensitivity space S is bounded.
+
+Note that the boundedness condition on the sensitivity space is inevitable, otherwise, we cannot
+mask the change between adjacent databases. For K = Hull(S), we define the K-norm ∥ · ∥K :
+S → R≥0 in the subspace S by ∥v∥K := inf{c ∈ R≥0 : u ∈ cK}. If s is the dimension of S,
+we can further define a corresponding norm in Rs, an isomorphic counterpart of S. Specifically,
+let ∥ · ∥Rs : Rs → R be defined by ∥v∥Rs = ∥θ−1(v)∥K for v ∈ Rs, where θ : S → Rs is a linear
+isomorphism. For instance, if {v1, . . . , vs} is an orthonormal basis of S, θ can map it to the standard
+basis {e1, . . . , es} in Rs. The K-norm mechanism described in Algorithm 2 samples in Rs via norm
+∥ · ∥Rs . The noise is then transformed back into the ambient space by the isomorphism.
+
+Algorithm 2 Optimal K-Norm Mechanism
+
+1: Input: Query ϕ to be privatized, invariant t, privacy parameter ϵ
+2: Get SSemi = {ϕ(X)− ϕ(X ′) : Aa(t)(X,X
+
+′) = 1} and set s = dim(span (SSemi))
+3: Define K-norm in S = span(SSemi) where K = Hull(SSemi), and isomorphism θ : S → Rs
+
+4: Define a norm ∥ · ∥Rs : Rs → R by ∥v∥Rs = ∥θ−1(v)∥K for v ∈ Rs
+
+5: Sample V ∼ fV (v) ∝ exp (−ϵ∥v∥Rs)
+6: Output: ϕ(X) + θ−1(V )
+
+Proposition 30 For a query ϕ : D → Rd, consider the sensitivity space SSemi = {ϕ(X)− ϕ(X ′) :
+Aa(t)(X,X
+
+′) = 1}. Let S = Span(SSemi) be a subspace spanned by SSemi, and let θ : S → Rs be a
+linear isomorphism, where s = dim(S). Define the norm ∥ · ∥Rs : Rs → R by ∥v∥Rs = ∥θ−1(v)∥K
+
+18
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+for v ∈ Rs, where ∥θ−1(v)∥K is the K-norm with K = Hull(SSemi). Then, we have
+
+∆s = sup
+Aa(t)(X,X′)=1
+
+∥θ(ϕ(X)− ϕ(X ′))∥Rs = 1.
+
+Theorem 31 (The optimal K-norm mechanism for Semi-DP). The K-norm mechanism in Algo-
+rithm 2 satisfies (Dt, Aa(t), fϵ,0)-DP and it is the optimal K-norm mechanism.
+
+The optimality in Theorem 31 stems from the fact that K = Hull(S) is the smallest norm ball,
+in terms of containment order, among all norm balls that include the sensitivity space in S. Then
+the norm ball induced by ∥ · ∥Rs is the smallest norm ball that contains θ(S) since the isomorphism
+θ preserves properties including containment.
+
+Finally, once the sensitivity space is of full-rank with the dataspace D and the adjacency function
+is A1(X,X
+
+′), our mechanism coincides with the K-norm mechanism in Awan and Slavković (2021).
+Therefore, our approach is indeed a generalization of theirs.
+
+5. Application to Contingency Table Analysis
+
+A contingency table, or a multi-way frequency table, is a fundamental data summary tool widely
+used in various fields, such as the DP publications by the US Census Bureau. In this section, we
+demonstrate how to create a privatized contingency table when true one-way margins are held invari-
+ant. We derive an optimized Gaussian mechanism satisfying Gµ-semi DP and K-norm mechanism
+satisfying fϵ,0-semi DP, along with numerical verification to show how our approach outperforms
+naive methods. Finally, we present a Semi-DP UMPU test for the odds ratio in a 2×2 contingency
+table.
+
+5.1 Private Release of Contingency Table under True Margins
+
+We identify a proper sensitivity space so that mechanisms investigated in Section 4 can be applied.
+To begin with, let ϕ : X n → Rr×c represent an r × c contingency table, where the sample space X
+is partitioned into r× c categories. The table can be vectorized into a d-dimensional vector, where
+d = r × c. Therefore, the contingency table can be written as ϕ : X n → Rd.
+
+The one-way margins of an r × c contingency table correspond to the margins for each feature
+A1 and A2, which are described using the notation T(X) in Example 3.4. Specifically, for two
+features A1 with r categories and A2 with c categories, the one-way margins are captured by
+T(X) = (T1(X), T2(X)), where T1(X) and T2(X) represent the total counts for each category of
+A1 and A2, respectively.
+
+Recall from Theorem 16 that the semi-adjacent parameter is bounded by a(t) ≤ 3 as r × c
+contingency table is counts for p = 2 features. To express the corresponding sensitivity space
+SSemi, we first introduce some notation.
+
+Define an r × c matrix vijkl as
+
+(vijkl)pq =
+
+
+1, if (p, q) = (i, j) or (p, q) = (k, l),
+
+−1, if (p, q) = (i, l) or (p, q) = (k, j),
+
+0, otherwise.
+
+In vijkl, i, k ∈ {1, . . . , r} are the row indices, and j, l ∈ {1, . . . , c} are the column indices. The
+matrix vijkl represents an element of the sensitivity space that adjusts four specific positions within
+an r×c contingency table while preserving the one-way margins. See Figure 1 for a typical example
+of a vijkl matrix.
+
+19
+
+
+
+Cho and Awan
+
+Figure 1: A 7 × 6 contingency table illustrating the sensitivity space element vijlk for the indices
+i = 2, j = 2, k = 5, and l = 5. The table shows the placement of +1 values at positions
+(i, j) = (2, 2) and (l, k) = (5, 5), as well as −1 values at positions (i, k) = (2, 5) and
+(l, j) = (5, 2), while all other cells contain zeros. It represents a typical element of the
+sensitivity space SSemi that preserves the one-way margins.
+
+Proposition 32 Let ϕ : X n → Rr×c be an r × c contingency table and let the invariant be its
+one-way margins t = T(X) = (T1(X), T2(X)). Then the sensitivity space SSemi with respect to the
+adjacency function A3 is
+
+SSemi =
+{
+vijlk ∈ Rr×c : i, k ∈ {1, . . . , r}, j, l ∈ {1, . . . , c}, i ̸= k, j ̸= l
+
+}
+∪ {0},
+
+where 0 denotes the zero matrix in Rr×c.
+
+The sensitivity space SSemi in Theorem 32 consists of matrices that preserve the one-way
+margins. The zero matrix, 0, emerges from scenarios where individual replacements do not affect
+the contingency table counts. For instance, consider swapping an individual with A1 = 1 and
+A2 = 1 for another individual with A1 = 2 and A2 = 2, followed by switching an individual with
+A1 = 2 and A2 = 2 back to an individual with A1 = 1 and A2 = 1. This process results in no net
+change to the table.
+
+The nonzero elements of SSemi are generated by modifying a total of three individuals, resulting
+in the placement of two 1’s and two −1’s in positions that preserve both the row and column sums.
+Each element in SSemi can be represented as a d = r× c dimensional vector through vectorization.
+Notably, Theorem 32 aligns with Lemma A.1 in Awan et al. (2024), which identified a basis for the
+space that preserves all margins for a contingency table.
+
+Example 7 For a 2 × 2 contingency table, where i, j, k, l ∈ {1, 2}, there are only two possible
+combinations that satisfy i ̸= k and j ̸= l: (i, j, k, l) = (1, 1, 2, 2) or (2, 1, 1, 2). Consequently, the
+nonzero elements in SSemi are: 1. For i = 1, j = 1, k = 2, l = 2:
+
+v1122 =
+
+[
+1 −1
+−1 1
+
+]
+or as a vector: (1,−1,−1, 1).
+
+2. For i = 2, j = 1, k = 1, l = 2:
+
+v2112 =
+
+[
+−1 1
+1 −1
+
+]
+or as a vector: (−1, 1, 1,−1).
+
+This matches what we observed in the 2× 2 contingency table in Section 3.4.
+
+20
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+Moreover, the sensitivities are given as ∆1(SSemi) = 4, ∆2(SSemi) = 2, and ∆∞(SSemi) = 1,
+regardless of r and c, since each nonzero vector in SSemi contains two 1s and two −1s, with zeros
+in all other positions.
+
+Having established the sensitivity space SSemi, we can now apply the mechanisms from Section
+4. For Gaussian mechanism in Algorithm 1, we leverage the sensitivity space SSemi in Theorem 32
+and the ℓ2 sensitivity ∆2(SSemi) = 2.
+
+Example 8 Gaussian mechanism in Algorithm 1 for 2 × 2 contingency table is deployed with
+∆2(SSemi) = 2 and
+
+P =
+1
+
+4
+
+
+1 −1 −1 1
+−1 1 1 −1
+−1 1 1 −1
+1 −1 −1 1
+
+ .
+
+This is because for s = dim(span(SSemi)), if {u1, · · ·us} is the basis of span(SSemi), the projection
+matrix P can be constructed by P =
+
+∑s
+i uiu
+
+⊤
+i and the basis in this case is {(1,−1,−1, 1)}.
+
+Likewise, we can deploy Algorithm 2 with K = Hull(SSemi). However, implementing the K-
+norm mechanism is not straightforward. The rank-deficiency in sensitivity space raises a technical
+difficulty as the corresponding convex hull is degenerate in the ambient space. To deal with this,
+we take a cube of the same dimension of SSemi that contains K and sample from the cube to
+implement a rejection sampler. Recall from Proposition 30 that ∆s(SSemi) = 1.
+
+Algorithm 3 Optimal K-Norm Mechanism with Rejection Sampling
+
+1: Input: Query ϕ, sensitivity space SSemi, sensitivity ∆K(SSemi) and privacy parameter ϵ
+2: Find basis {bi}si=1 for span(Hull(SSemi))
+3: Sample r ∼ Gamma(α = s+ 1, β = ϵ/∆K(SSemi)
+4: Find scaling constants c1, · · · , ck such that a cube
+
+∏s
+i=1[−ci, ci] contains Hull(SSemi) in the
+
+coordinates {bi}si=1
+
+5: Sample Uj
+iid∼ U(−1, 1) for j = 1, · · · , s
+
+6: Set V =
+∑s
+
+i=1 Uicibi
+7: If V ∈ Hull(S), output ϕ(X) + rV , else go to 5
+
+The K-norm mechanism in Algorithm 3 works by finding a basis for the span of the convex hull
+of the sensitivity space Hull(SSemi) and generating noise from a cube enclosing the convex hull of
+the sensitivity space. Rejection sampling ensures that the generated noise lies within the convex
+hull, and thus satisfies the privacy constraints.
+
+Remark 33 Note that one may apply additional transformations to the mechanism’s output through
+various post-processing methods. For example, while preserving the margins, each count can be ad-
+justed to a nonnegative integer value. Since these transformations use only the private output and
+publicly available invariant, without accessing the raw data, the same privacy guarantee is still
+satisfied by the post-processing property in Theorem 23.
+
+5.2 Numerical Experiments for additive noise
+
+In this section, we numerically compare the L2-costs of our mechanisms with those of naive de-
+signs. We treat the contingency table ϕ(X) as fixed, with its entries sampled from a multinomial
+distribution, Multinomialk2(n, π). For our comparisons, we set n = 500 and consider two models
+
+21
+
+
+
+Cho and Awan
+
+for the true probabilities π = (π1, . . . , πk2). In Model I, we assume a uniform probability for each
+cell, setting πi = 1/k2 for all i. In Model II, the cell probabilities increase linearly, defined by
+
+πi = i/
+(∑k2
+
+i=1 i
+)
+. To be consistent with the approach in Section 5.1, we assume that all one-way
+
+margins are published. Here, we calculate a(t) = 3 to consider the privacy guarantee for the worst-
+case. We report the average L2-loss ∥M(X) − ϕ(X)∥2 aggregated over 30 replicates to assess the
+performance of the mechanisms.
+
+Comparison on Gaussian Mechanisms: While running our Gaussian mechanism from Algo-
+rithm 1, we compare it to a naive Gaussian mechanism defined as:
+
+MNaive(X) = ϕ(X) +N(0, (3
+√
+2/µ)2I).
+
+This naive mechanism uses an ℓ2 sensitivity of
+√
+2, as previously observed, and a semi-adjacency pa-
+
+rameter of a(t) = 3. Since any mechanism that satisfies (D, A1, Gµ/3)-DP also satisfies (D, A3, Gµ)-
+DP by the group privacy property, and further satisfies (Dt, A3, Gµ)-DP, we adjust the Gaussian
+mechanism from Proposition 6 by substituting µ/3 in place of µ. Therefore, this naive approach
+effectively inflates the sensitivity by the semi-adjacency parameter when applying the Gaussian
+noise.
+
+Figure 2: Comparison of average L2-costs between our mechanism and the naive mechanism across
+varying contingency table sizes k ∈ {2, 3, . . . , 10}. Model I assumes uniform cell proba-
+bilities, while Model II has linearly increasing cell probabilities.
+
+Figure 2 demonstrates that our Gaussian mechanism from Algorithm 1 consistently results in
+smaller L2 costs compared to the naive approach across both models. This aligns with theoretical
+expectations, as our mechanism applies Gaussian noise with a smaller covariance. Specifically, the
+covariance of the Gaussian noise in our mechanism, (2/µ)2Pk×k, is smaller than that used in the
+naive approach, (3
+
+√
+2/µ)2Ik×k. This is due to the fact that 2/µ < 3
+
+√
+2/µ and Pk×k ⪯ Ik×k, where
+
+Pk×k is the projection matrix.
+
+22
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+Comparison on K-Norm Mechanisms: To numerically compare the K-norm mechanisms, we
+consider different contingency table sizes by taking k ∈ {2, 3} with different privacy parameters
+ϵ ∈ {0.1, 0.5, 1}.
+
+Figure 3: Comparison of L2-costs for the K-norm mechanism against naive ℓ1, ℓ2, and ℓ∞-norm
+mechanisms across two models for contingency tables of size k = 2 and k = 3. The
+results are shown for three privacy parameters ϵ = 0.1, 0.5, and 1.
+
+We implement the optimal K-norm mechanism by Algorithm 3 with the sensitivity space SSemi
+
+as identified in Theorem 32. On the other hand, we consider ℓ1, ℓ2, ℓ∞-norm mechanisms in a naive
+way. We run ℓ1, ℓ2 and ℓ∞-norm mechanisms in Section B in the Appendix with the sensitivity
+space SDP = {ϕ(X)− ϕ(X ′) : A1(X,X
+
+′) = 1}. Note that ℓ1, ℓ2, and ℓ∞-sensitivities from SDP are
+2,
+
+√
+2, and 1, respectively, since we can easily check that each element of SDP is a vector with a
+
+single 1 and a single −1. On the other hand, we take the privacy parameter ϵ/3 so that the naive
+mechanisms satisfy (D, A1, fϵ/3,0). By doing so, they satisfy (D, A3, fϵ/,0)-DP, and immediately
+(Dt, A3, fϵ/,0)-DP. Same as what we have observed in the naive Gaussian mechanism, the naive
+mechanisms via group privacy use sensitivities inflated by a factor of 3 to achieve group privacy
+with a(t) = 3.
+
+Finally, Figure 3 shows see the efficiency of the optimal K-norm mechanism, which achieves
+significantly lower L2-cost compared to other naive mechanisms.
+
+23
+
+
+
+Cho and Awan
+
+5.3 Semi Private UMPU Testing
+
+This section formalizes the construction of the UMPU test for odds ratio testing under Semi-DP
+given the one-way margins as the invariant. We extend the framework of semi-private hypothesis
+testing introduced in Awan and Vadhan (2023), where the concept was employed to establish
+upper bounds on the power of private hypothesis testing. Specifically, Awan and Vadhan (2023)
+demonstrated that while no UMPU test satisfying DP exists in general, it is achievable under
+Semi-DP. Their results were focused on tests for the difference of proportions in Bernoulli data.
+We extend this approach to testing the odds ratio in a 2×2 contingency table with the invariant as
+the one-way margins. By refining the definition of semi-privacy, we also provide a more simplified
+proof.
+
+Denote a 2 × 2 contingency table by (x11, x12, x21, x22) and let the one-way margins t =
+(t1·, t2·, t·1, t·2)
+
+⊤ be the invariant, where ti· =
+∑2
+
+j=1 xij and t·,j =
+∑2
+
+i=1 xij . We test the odds
+
+ratio w = θ2/1−θ2
+θ1/1−θ1
+
+:
+
+H0: w ≤ 1 vs. H1: w > 1,
+
+while preserving the privacy of individuals in the database.
+
+We follow the framework of f -DP hypothesis testing as investigated in Awan and Vadhan
+(2023). One can define a test to be a function ϕ : D → [0, 1], where ϕ(X) represents the prob-
+ability of rejecting the null hypothesis given the database X. According to Awan and Vadhan
+(2023), the mechanism corresponding to this test releases a random variable drawn as Bern(ϕ(X)),
+where 1 represents “Reject” and 0 represents “Accepts”. The test ϕ satisfies (D, A, f)-DP if the
+corresponding mechanism Bern(ϕ(X)) satisfies (D, A, f)-DP.
+
+Lemma 34 (Lemma 4.1 in Awan and Vadhan (2023)). Let D be a dataspace, A : D × D be an
+adjacency function and f be a tradeoff function. A test ϕ : D → [0, 1] satisfies (D, A, f)-DP if and
+only if ϕ(X) ≤ 1− f(1− ϕ(X ′)) for all X,X ′ ∈ D such that A(X,X ′) = 1.
+
+Lemma 34 shows that a test function satisfies (D, A, f)-DP if for any databases X,X ′ ∈ D such
+that A(X,X ′) = 1, the values ϕ(X) and ϕ(X ′) are close in terms of an inequality based on f .
+
+Recall from Example 5 that when the one-way margins are invariant, a(t) ≤ 3. From Example
+7, we know that the sensitivity space for a query that publishes the 2× 2 contingency table given
+this invariant is
+
+SSemi = {(1,−1,−1, 1), (−1, 1, 1,−1), (0, 0, 0.0)}.
+
+Thus, by Lemma 34, ϕ is a (Dt, Aa(t), f)-DP test if
+
+ϕ(x11, x12, x21, x22) ≤ 1− f(1− ϕ(x11 + 1, x12 − 1, x21 − 1, x22 + 1)),
+
+ϕ(x11, x12, x21, x22) ≤ 1− f(1− ϕ(x11 − 1, x12 + 1, x21 + 1, x22 − 1)).
+(2)
+
+In Awan and Vadhan (2023), they utilized a canonical noise distribution (CND) for f -DP to
+construct optimal tests. A CND is formulated to satisfy f -DP for any given tradeoff function f
+by optimally matching the tradeoff function. After being introduced by Awan and Vadhan (2023),
+CNDs have been further investigated in Awan and Dong (2022) and Awan and Ramasethu (2023).
+
+Definition 35 (Canonical noise distribution (CND) (Awan and Vadhan, 2023)). Let f be a sym-
+metric nontrivial tradeoff function. A continuous distribution function F is a canonical noise
+distribution(CND) for f if
+
+24
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+1. for every statistic ϕ : D → R with sensitivity ∆ > 0, and N ∼ F (·), the mechanism ϕ(X)+∆N
+satisfies f -DP. Equivalently, for every m ∈ [0, 1], T (F (·), F (· −m)) ≥ f ,
+
+2. f(α) = T (F (·), F (· − 1))(α) for all α ∈ (0, 1),
+
+3. T (F (·), F (· − 1))(α) = F (F−1(α)− 1) for all α ∈ (0, 1),
+
+4. F (x) = 1−F (−x) for all x ∈ R; that is, F is the cdf of a random variable which is symmetric
+about zero.
+
+In Definition 35, the four properties can be interpreted as follows: 1) adding noise scaled by
+the sensitivity ∆ to a statistic with sensitivity ∆ ensures that the resulting mechanism satisfies
+(D, A, f)-DP; 2) when the statistics for two datasets differ exactly by the sensitivity ∆, the tradeoff
+function T between the two noisy statistics equals f , indicating that the privacy protection is
+optimally tight; 3) for such statistics as in part 2, the optimal rejection region follows a threshold
+form, which demonstrates a monotone likelihood ratio property; and 4) because the f -DP guarantee
+is symmetric, we restrict our attention to symmetric distributions. For example, N(, 1/µ2) is a CND
+for (D, A,Gµ)-DP and Tulap distribution is the unique CND for (D, A, f(ϵ,δ))-DP (Awan and Dong,
+2022).
+
+Awan and Vadhan (2023) proved that a CND exists for any symmetric nontrivial tradeoff
+function f and gave the following construction, which can be easily sampled by inverse transform
+sampling:
+
+Lemma 36 (CND Construction: Theorem 3.9 in (Awan and Vadhan, 2023)). Let f be a symmet-
+ric nontrivial tradeoff function. Let c ∈ [0, 1/2) be the unique value satisfying f(1− c) = c. Define
+Ff : R → R as
+
+Ff (x) =
+
+
+f(Ff (x+ 1)) if x < −1/2,
+
+c(1/2− x) + (1− c)(x+ 1/2) if − 1/2 ≤ x ≤ 1/2,
+
+1− f(1− Ff (x− 1)) if x > 1/2.
+
+Then Ff is a canonical noise distribution for f .
+
+Awan and Vadhan (2023) showed that CNDs are central to the construction of optimal DP
+tests.
+
+Recall that our objective is to develop a private test that satisfies Semi-DP while maximizing
+statistical power. Without the privacy constraint, there is no UMP test for this problem. Tradi-
+tionally, attention is restricted to unbiased tests. Recall that for a parameter space Ω that can be
+partitioned into Ω = Ω0 ∪ Ω1, a test is unbiased if for all w1 ∈ Ω1 and w0 ∈ Ω0, the power at Ω1
+
+is higher than at w0. Then the search for a UMP unbiased test can be restricted to tests which
+satisfy Ew=1 (ϕ(X11, X12, X21, X22) | T ) = α by leveraging the Neyman structure as in Awan and
+Vadhan (2023).
+
+Note that (x11, x12, x21, x22) | t is equal in distribution to (H, t1· −H, t·1 −H, H + t2· − t·1),
+where H ∼ Hyper(t1·, t2·, t·1, w) is the Fisher noncentral hypergeometric distribution, which has
+the probability mass function (pmf):
+
+Pw (H = x) =
+
+(
+t1·
+x
+
+)(
+t2·
+
+t·1−x
+
+)
+wx∑U
+
+k=L
+
+(
+t1·
+k
+
+)(
+t2·
+
+t·1−k
+
+)
+wk
+
+,
+
+25
+
+
+
+Cho and Awan
+
+with support L = max{0, t·1 − t2·}, L + 1, . . . , U = min{t1·, t·1}. Additionally, x11 | t1· ∼
+Binom(t1·, θ1) and x21 | t2· ∼ Binom(t2·, θ2).
+
+This leads to tests ϕ satisfying:
+
+EH∼Hyper(t1·,t2·,t·1,1)ϕ (H, t1· −H, t·1 −H, H + t2· − t·1) = α, (3)
+
+as shown in Lemma 46.
+Then the Semi-DP UMPU test is equivalent to identifying the UMP among the following set of
+
+(Dt, Aa(t), f)-DP tests:
+
+Φsemi
+f = {ϕ(x11, x12, x21, x22) : ϕ satisfies Equation (2) and Equation (3)} . (4)
+
+Theorem 37 Let f be a symmetric nontrivial tradeoff function, and let Ff be a CND for f . Let
+α ∈ (0, 1) be given. For the 2× 2 contingency table and the hypothesis H0 : w ≤ 1 vs. H1 : w > 1,
+
+ϕ∗(X) = ψ∗
+z(x11) = Ff (x11 −m(t)) , (5)
+
+is the UMP among Φsemi
+f , where m(t) is chosen such that the test has size α. Moreover, if N ∼ Ff ,
+
+then U = X11 +N satisfies (Dt, Aa(t), f)-DP, and the quantity
+
+p = EX11∼Hyper(t1·,t2·,t·1,1)Ff (X11 − U), (6)
+
+which is a post-processing of U , is a p-value that agrees with ϕ∗(X). That is, PU (p ≤ α | X) =
+ϕ∗(X).
+
+In Theorem 37, only x11 is actually utilized among the four variables. However, it does not
+necessarily have to be x11; any of the variables x11, . . . , x22 can be free. This is because there are
+three independent constraints imposed by the given margins t, resulting in one degree of freedom.
+Once a value, such as x11, is determined, the remaining three counts are subsequently determined
+by x11 and the margins t.
+
+We remark that both our derivation and the original semi DP test in Awan and Vadhan (2023)
+leverage a DP version of the classic Neyman-Pearson Lemma, originally developed in Awan and
+Slavković (2018). However, unlike Awan and Vadhan (2023) which leverages group privacy type
+reasoning on their construction, we directly target the UMP test among the tests with Neyman
+structure under the Semi-DP constraint. The simplified proof highlights the value of understanding
+the Semi-DP framework.
+
+6. Analysis on US 2020 Census Redistricting Data (P.L. 94-171)
+
+The US Census published noisy counts on demographics while giving some true counts in the 2020
+Census Redistricting Data (P.L. 94-171) Summary File.2 In the 2020 Census Disclosure Avoidance
+System (DAS) and the TopDown Algorithm (TDA), the invariants consist of the following counts:
+
+• total population for each state, the District of Columbia, and Puerto Rico,
+
+• the number of housing units in each block (but not the population living in theses housing
+units), and
+
+• the count and type of occupied group quarters in each block (but not the population living
+in theses group quarters).
+
+2. https://www.census.gov/programs-surveys/decennial-census/about/rdo/summary-files.html#P1
+
+26
+
+https://www.census.gov/programs-surveys/decennial-census/about/rdo/summary-files.html#P1
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+These invariants are crucial for specific operations and legal requirements, such as the appor-
+tionment of the House of Representatives and maintaining the Master Address File (MAF) used in
+the census.
+
+Rather than f -DP or (ϵ, δ)-DP, the baseline DP definition in the 2020 Decennial Census is ρ-
+zero Concentrated DP(ρ-zCDP) that utilizes Rényi divergence to measure the similarity on outputs
+
+of mechanisms. ρ-zCDP is slightly weaker than µ-GDP as µ-GDP implies µ2
+
+2 -zCDP, but not the
+opposite (Dong et al., 2022). Su et al. (2024) recently derived an optimized privacy accounting for
+the US Census products using f -DP, but we will restrict our analysis to ρ-zCDP for simplicity.
+
+Definition 38 (zero-Concentrated Differential Privacy (zCDP), (Bun and Steinke, 2016)) Given
+ρ ≥ 0, a randomized mechanism M : D → Y satisfies (D, A, ρ)-zero-concentrated differential
+privacy((D, A, ρ)-zCDP) if for all X,X ′ ∈ D such that A(X,X ′) = 1, and all α ∈ (1,∞) :
+
+Dα(M(X)∥M(X ′)) ≤ ρα,
+
+where Dα(P∥Q) = 1
+α−1 log
+
+(∑
+E∈Y P (E)αQ(E)(1−α)
+
+)
+is the Rényi divergence of order α of the
+
+distribution P from the distribution Q.
+
+We can adopt our privacy framework to the zCDP setting as well. Given the invariant t and its
+corresponding semi-adjacent parameter a(t), we write a mechanism M satisfies (Dt, Aa(t), ρ)-zCDP
+when for all X,X ′ ∈ Dt such that Aa(t) = 1, Dα(M(X)∥M(X ′)) ≤ ρα for all α ∈ (1,∞).
+
+To facilitate the comparison of privacy guarantees in different frameworks, we utilize the fol-
+lowing two lemmas. Lemma 39 establishes group privacy in zCDP while Lemma 40 provides the
+conversion from ρ-zCDP guarantantee to (ϵ, δ)-DP guarantee. Together, these lemmas offer the
+necessary tools for our analysis in the following section.
+
+Lemma 39 (Group privacy in zCDP, (Bun and Steinke, 2016)) Let M : D → Y satisfy ρ-zCDP.
+Then M guarantees (k2ρ)-zCDP for groups of size k, that is, for every X,X ′ ∈ D differing in up
+to k entries and every α ∈ (1,∞), we have
+
+Dα(M(X)∥M(X ′)) ≤ (k2ρ)α.
+
+Lemma 40 ((Bun and Steinke, 2016)) If a randomized algorithm M satisfies ρ−zCDP, it satisfies
+(ϵ = ρ+ 2
+
+√
+ρ log(1/δ), δ)−DP for all δ > 0.
+
+According to Abowd et al. (2022), for the production run of the 2020 Census Redistricting Data
+(P.L. 94-171) Summary File, a total privacy-loss budget of ρ = 2.63 was used with ρ = 2.56 used for
+person tables and ρ = 0.07 for housing-units tables. The exact allocation of ρ for a specific query
+at each geographical level can be calculated using the total allocation of ρ and the proportions
+provided in Abowd et al. (2022).
+
+6.1 Semi-DP Analysis of the US Census Product
+
+In this section, we analyze the privacy guarantees of the US Census product using the Semi-DP
+framework. Specifically, we focus on the total population counts for each state as an invariant and
+demonstrate how the Census’s mechanism provides privacy guarantees based on semi-adjacency
+accounting for the presence of the invariant. Note that the other two counts—of housing units and
+group quarters—are not about individual citizens, which is the unit of privacy protection. We also
+compare the privacy guarantees in both the zCDP and (ϵ, δ)-DP frameworks.
+
+27
+
+
+
+Cho and Awan
+
+We can analyze the privacy guarantee of the US Census product using the semi-adjacent pa-
+rameter a(t). Since the total population count for each state is an example of a one-way margin
+involving a single feature, we have a(t) = 2, as established by Theorem 16.
+
+With a(t) = 2, the Census mechanism satisfies (Dt, A2, 10.24)-zCDP, rather than satisfying
+(D, A1, 2.56)-zCDP as the Census announced. The parameter 10.24 arises from the group privacy
+property of ρ-zCDP, where the privacy parameter is inflated by a factor of 22ρ for a group of size 2,
+as described in Lemma 39. Furthermore, satisfying group privacy of size 2 under D and A2 implies
+Semi-DP under Dt and A2.
+
+Additionally, when converting the ρ-zCDP guarantee to an (ϵ, δ)-DP guarantee with δ = 10−10,
+the guarantee advertized by Census is ϵ = 17.91528, while our approach yields ϵ = 40.95057, both
+derived using Lemma 40.
+
+According to our Semi-DP framework, the Census is paying a higher privacy cost than what
+they have explained as the advertised (D, A1, 2.56)-zCDP guarantee does not account for the impact
+of the invariant.
+
+7. Conclusion and Discussion
+
+This work introduces a general Semi-DP framework, building on the concept introduced in Awan
+and Vadhan (2023), as an extension of traditional DP to address scenarios where true statistics,
+or invariant, are released alongside DP outputs. Semi-DP redefines adjacency relations to focus on
+invariant-conforming datasets, providing privacy protection in complex situations that existing DP
+approaches do not fully address. However, Semi-DP has limitations, particularly in maintaining
+individual-level privacy, which is a key strength of traditional DP.
+
+The main limitation of Semi-DP lies in the restricted notion of adjacency. In traditional DP,
+using the adjacency function A1, any individual xi in the confidential dataset can be replaced with
+any other individual y, thereby guaranteeing individual-level protection. In contrast, under Semi-
+DP, the choices for y are limited to the set Di
+
+t, where the candidates are constrained to individuals
+who belong to datasets that conform to the same invariant. This restriction reduces the flexibility
+in substituting x, potentially weakening privacy protection.
+
+Specifically, if an adversary possesses side information indicating that certain candidates y are
+not actually present in the dataset, a privacy breach could occur when x attempts to “pretend” to
+be one of these excluded candidates. In such cases, the adversary would immediately recognize the
+substitution as a false representation, thus compromising the privacy of x. This scenario illustrates
+how Semi-DP may fail to provide the same level of privacy protection as traditional DP, where
+individual-level guarantees remain robust even if an adversary knows n− 1 entries in the dataset.
+
+This discussion extends to the implications of side information that an adversary may possess.
+In standard DP, side information generally does not compromise privacy guarantees because the
+protection is inherently robust against disclosure of individual entries. However, in Semi-DP, the
+presence of side information, especially when combined with an invariant, can pose a significant
+threat to privacy. In the extreme, there can be some side information that, where merged with the
+invariant, narrows down the databases to a single database, thus completely undermining privacy.
+
+Overall, while Semi-DP provides a novel approach to handling complex privacy scenarios involv-
+ing invariants, it requires careful consideration of its limitations and the potential risks associated
+with side information. Future work may develop strategies to quantify and mitigate these vul-
+nerabilities, such as refining the definition of adjacency or gaining a deeper understanding of the
+structure of a given invariant to better characterize the trade-offs between privacy guarantees and
+the release of sensitive information.
+
+28
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+Acknowledgments
+
+This research was supported in part by the NSF grant SES-2150615. We would like to express our
+gratitude to Sewhan Kim and Jinwon Sohn for their contributions during the early stages of this
+project.
+
+Appendix A. Proofs
+
+A.1 Proof of Theorem 16
+
+Proof Let X∗ be the confidential database consisting of n individuals, and let the one-way margins
+t = T(X∗) be the invariant. The semi-adjacent parameter a(t) measures the worst-case number
+of changes required to change an individual x into another individual y, while ensuring that the
+invariant t are preserved.
+
+Consider any individual x ∈ X∗. To address the worst-case scenario, choose y such that all p
+features of y differ from those of x, meaning yi ̸= xi for each feature i = 1, . . . , p. Changing x to y
+involves changing each feature of x, denoted xi, to the corresponding yi.
+
+Note on the other hand that since y is chosen from the set of possible data values across datasets,
+
+there exist individuals x(1), . . . , x(p) ∈ X∗ such that, for each feature i, x
+(i)
+i = yi. This ensures that
+
+there is at least one individual in the dataset who shares feature i with y.
+Therefore, we can proceed the following to preserve the one-way margins: For each feature i,
+
+choose x(i) ∈ X∗ and change this individual to someone who has xi for feature i, while keeping all
+other features the same as those of x(i). This modification ensures that the value yi is replaced
+with the original xi, while leaving the counts for other features unchanged, thereby maintaining
+the one-way margins. This adjustment requires p additional changes, one for each feature.
+
+Therefore, the total number of changes is p+ 1, leading to the upper bound:
+
+a(t) ≤ p+ 1.
+
+A.2 Proof of Theorem 21
+
+The proof of Theorem 21 relies primarily on Lemma 41, from Awan and Dong (2022).
+
+Lemma 41 (Proposition A.7 in Awan and Dong (2022).) Let f and g be tradeoff functions. Then
+
+(f ⊗ g)◦k ≤ f◦k ⊗ g◦k.
+
+By induction, Lemma 41 can be extended to any finite number of tradeoff functions.
+
+Proof First of all, it is clear that both ways of analysis share the same indistinguishable pairs:
+
+IND(Dt, Aa) = {(X,X ′) ∈ Dt ×Dt : Aa(X,X
+′) = 1},
+
+as IND depends only on the invariant t and semi-adjacent parameter a.
+To compare the tradeoff functions, consider the composition first strategy. By the compsition
+
+property of DP, the tradeoff function of (M1(X), · · · ,Mk(X)) for any databases X,X ′ such that
+A1(X,X
+
+′) = 1, we have
+
+T
+(
+(M1(X), · · · ,Mk(X)), (M1(X
+
+′), · · · ,Mk(X
+′))
+)
+≥ f1 ⊗ · · · ⊗ fk.
+
+29
+
+
+
+Cho and Awan
+
+Moreover, as d(X,X ′) = a, by the group privacy property on (M1(·), · · · ,Mk(·)), we have
+
+T
+(
+(M1(X), · · · ,Mk(X)), (M1(X
+
+′), · · · ,Mk(X
+′))
+)
+≥ (f1 ⊗ · · · ⊗ fk)
+
+a.
+
+On the other hand, for the Semi-DP first strategy, note that for each Mi(X), we have
+
+T (Mi(X),Mi(X
+′)) ≥ f◦a,
+
+for any pair (X,X ′) ∈ IND(Dt, a) by Proposition 11. Then, by the composition property, the
+tradeoff function of the joint release (M1(X), · · · ,Mk(X)) for (X,X ′) ∈ IND(Dt, a) satisfies
+
+T
+(
+(M1(X), · · · ,Mk(X)), (M1(X
+
+′), · · · ,Mk(X
+′))
+)
+≥ f◦a1 ⊗ · · · ⊗ f◦ak .
+
+Finally, the comparison between the two tradeoff functions is immediate by Lemma 41.
+
+A.3 Proof of Proposition 24
+
+Proof It is sufficient to show the set inclusions SSemi ⊆ SGroup and Hull(SSemi) ⊆ aHull(SDP )
+since the inequalities in sensitivity immediately follows from the set inclusions.
+
+To begin with, SSemi ⊆ SGroup is clear since Dt ⊆ D and both the sensitivity space relies on
+the same adjacent function Aa.
+
+To see Hull(SSemi) ⊆ aHull(SDP ), take any u ∈ Hull(SSemi). Then there exist s1, · · · , sn such
+that
+
+u =
+n∑
+
+i=1
+
+λisi,
+
+where the real numbers λi satisfy λi ≥ 0 and λ1 + · · ·+ λn = 1.
+
+Note then for each si, si = ϕ(X) − ϕ(X ′) for some X,X ′ such that d(X,X ′) ≤ a. Take
+X0, X1, · · · , Xa such that X0 = X,Xa = X ′ and for each i such that 0 ≤ i ≤ a − 1, Xi+1 be
+obtained from Xi by changing one row. Then
+
+si = ϕ(X0)− ϕ(Xa)
+
+=
+
+a∑
+j=1
+
+[ϕ(Xj−1)− ϕ(Xj)]
+
+= qi1 + · · ·+ qia,
+
+where qij := [ϕ(Xj−1)− ϕ(Xj)] ∈ SDP for all j ∈ {1, 2, · · · , a}.
+By taking βij = λi, we can write u by
+
+u =
+
+n∑
+i=1
+
+a∑
+j=1
+
+λiq
+i
+j =
+
+n∑
+i=1
+
+a∑
+j=1
+
+βijq
+i
+j ,
+
+where
+∑a
+
+j=1
+
+∑n
+i=1 βij =
+
+∑a
+j=1
+
+∑n
+i=1 βijλi =
+
+∑a
+j=1 1 = a. Therefore, u
+
+a ∈ Hull(SDP ) as desired
+
+30
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+A.4 Proof of Proposition 25
+
+Proof Let t = Lϕ(X), where L is a matrix representing a non-trivial linear transformation. The
+sensitivity space SSemi is defined as:
+
+SSemi = {ϕ(X)− ϕ(X ′) : Lϕ(X) = Lϕ(X ′) and Aa(t)(X,X
+′) = 1}.
+
+This means that for any u = ϕ(X) − ϕ(X ′) ∈ SSemi, the condition Lϕ(X) = Lϕ(X ′) implies
+L(ϕ(X) − ϕ(X ′)) = L(u) = 0. Hence, every element of SSemi lies in the kernel of L, so L(u) = 0
+for all u ∈ SSemi.
+
+Since L is a non-trivial linear transformation, the kernel of L, ker(L), has dimension strictly
+less than the full space D, implying that the space S ⊆ ker(L) is rank-deficient.
+
+A.5 Proof for Proposition 26
+
+Before we delve into the main part of the proof of Proposition 26, the following Lemma 42 is the
+key tool for mechanism design in that it shows that applying Proj⊥S ϕ(·) as post-processing does
+not affect the privacy guarantee, where Proj⊥S ϕ(·) is the orthogonal projection operator onto the
+orthogonal complement of S.
+
+Lemma 42 A mechanism Proj⊥S ϕ(X) is constant for all input databases X.
+
+Proof For any X,X ′ such that A(X,X ′) = 1, we have
+
+ϕ(X)− ϕ(X ′) ∈ S,
+
+so we have Proj⊥S (ϕ(X)− ϕ(X ′)) = 0, or Proj⊥S ϕ(X) = Proj⊥S ϕ(X
+′).
+
+Therefore, Proj⊥S ϕ(X) is constant for all X
+
+Proof of Proposition 26 We apply post-processing property twice.
+
+First, apply a transformation ProjS to M(X) = ϕ(X) + e. Then ProjS M(X) = ProjS ϕ(X) +
+ProjS e still satisfies (D, A, f)-DP by the post-processing property.
+
+Second, we apply an additional transformation on ProjS M(X) by adding Proj⊥S ϕ(X). Recall
+that Lemma 42 shows Proj⊥S ϕ(X) is a data-independent constant. Therefore, by the post-processing
+property again,
+
+ϕ(X) + ProjS e = ProjS M(X) + Proj⊥S ϕ(X) = ProjS ϕ(X) + Proj⊥S ϕ(X) + ProjS e
+
+satisfies (D, A, f)-DP, as desired.
+
+A.6 Proof for Proposition 28
+
+Note that we use the following lemma in this proof:
+
+Lemma 43 (Lemma A.2. in (Kim et al., 2022)). Let µ1, µ2 ∈ Rd be arbitrary and Σ be a d × d
+symmetric positive-definite matrix. Then,
+
+T (Nd(µ1,Σ), Nd(µ2,Σ)) = G
+∥Σ− 1
+
+2 (µ2−µ1)∥2
+.
+
+31
+
+
+
+Cho and Awan
+
+Proof We first show that the intermediary Gaussian mechanism
+
+MI(X) = ϕ(X) + e,
+
+where e ∼ Nd
+
+(
+0,
+(
+∆2(SSemi)
+
+µ
+
+)2
+Id
+
+)
+satisfies (Dt, Aa(t), Gµ)-DP.
+
+To this end, take any pair of databases X,X ′ ∈ Dt such that Aa(t)(X,X
+′) = 1. Then MI(X) ∼
+
+Nd
+
+(
+ϕ(X),
+
+(
+∆2(SSemi)
+
+µ
+
+)2
+Id
+
+)
+and MI(X
+
+′) ∼ Nd
+
+(
+ϕ(X ′),
+
+(
+∆2(SSemi)
+
+µ
+
+)2
+Id
+
+)
+. By Lemma 43,
+
+T (MI(X),MI(X
+′)) = G∥ϕ(X)−ϕ(X′)∥2 µ
+
+∆2(SSemi)
+.
+
+Since 0 ≤ a ≤ b if and only if Ga ≥ Gb,
+
+inf
+X,X′:A(X,X′)=1
+
+T (MI(X),MI(X
+′)) = inf
+
+u∈S
+G∥u∥2 µ
+
+∆2(SSemi)
+= Gsupu∈S ∥u∥2 µ
+
+∆2(SSemi)
+= Gµ.
+
+Therefore, MI(X) is (Dt, Aa(t), Gµ)-DP.
+
+Now let P be a projection matrix that projects onto span(S). Then we can decompose ϕ(X)
+as ϕ(X) = Pϕ(X) + (I − P )ϕ(X).
+
+Note that PMI(X) = Pϕ(X)+Pe satisfies (Dt, Aa(t), Gµ)-DP as well, by post-processing, where
+
+Pe ∼ Nd
+
+(
+0, (∆2(SSemi/µ)
+
+2P
+)
+so that Pe
+
+d
+= N in Algorithm 1.
+
+Moreover, an additional transformation on PMI(X) by adding (I − P )ϕ(X) also satisfies
+(Dt, Aa(t), Gµ)-DP by Lemma 42 that shows that (I−P )ϕ(X) is a data-independent constant. Alto-
+gether, PMI(X)+(I−P )ϕ(X) = Pϕ(X)+(I−P )ϕ(X)+N = ϕ(X)+N satisfies (Dt, Aa(t), Gµ)-DP,
+as desired.
+
+A.7 Proof for Lemma 29
+
+Proof Note that a set K is a norm ball in S if K ∈ S is 1) convex, 2) bounded 3) symmetric
+about zero: if u ∈ K, then −u ∈ K, and 4) absorbing: ∀u ∈ S, ∃c > 0 such that u ∈ cK.
+
+Note that K = Hull(S) is convex by the definition of convex hull and the boundedness condition
+is straightforward as S is assumed to be bounded. In addition, symmetry is clear from the symmetry
+of adjacency relation in DP.
+
+To see the absorbing property, take any v ∈ S. Since S spans S, we can write v =
+∑m
+
+i=1 aisi,
+where m = |S| <∞.
+
+Now, let n be the number of nonnegative a′is and rearrange the summation by the sum of
+nonnegative coefficients and negative coefficients:
+
+v =
+
+n∑
+i=1
+
+aisi +
+
+m∑
+j=n+1
+
+ajsj
+
+=
+
+n∑
+i=1
+
+aisi +
+
+m∑
+j=n+1
+
+|aj |(−sj)
+
+=
+
+(
+n∑
+
+i=1
+
+ai
+
+)
+n∑
+
+i=1
+
+ai∑n
+i=1 ai
+
+si +
+
+ m∑
+j=n+1
+
+|aj
+
+ m∑
+j=n+1
+
+|aj |∑m
+j=n+1 |aj |
+
+(−sj).
+
+32
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+We see that h1 :=
+∑n
+
+i=1
+ai∑n
+i=1 ai
+
+si and h2 :=
+∑
+
+j=n+1m
+|aj |∑m
+
+j=n+1 |aj |
+(−sj) are both convex combina-
+
+tions of S. Now letting k = 1∑n
+i=1 ai+
+
+∑m
+j=n+1 |aj |
+
+, then
+
+kv =
+
+∑n
+i=1 ai∑n
+
+i=1 ai +
+∑m
+
+j=n+1 |aj |
+h1 +
+
+∑m
+j=n+1 |aj |∑n
+
+i=1 ai +
+∑m
+
+j=n+1 |aj |
+h2,
+
+so kv is a convex combination of h1 and h2. Thus, kv ∈ Hull(S).
+
+Therefore, v ∈ cHull(S), where c = 1/k and we have that the norm ball is absorbing.
+
+A.8 Proof for Theorem 31
+
+Proof We first prove the privacy guarantee and then prove the optimality. To begin with, consider
+the following decomposition of ϕ(X):
+
+ϕ(X) = ProjS ϕ(X) + Proj⊥S ϕ(X).
+
+Since S is a subspace of Rd of dimension s, it is isomorphic to Rs. For an isomorphism θ : S →
+Rs, consider θ(ProjS ϕ(X)) ∈ Rs. It is clear that a mechanism θ(ProjS ϕ(X))+V satisfies (D, A, fϵ)-
+DP. Then the privacy guarantee for ϕ(X)+ θ−1(V ) is by applying the post-processing twice: First,
+the post-processing ProjS ϕ(X)+ θ−1(V ) = θ−1(θ(ProjS ϕ(X))+V ) satisfies (D, A, fϵ)-DP as well.
+Moreover, Proj⊥S ϕ(X) is a data-independent constant for all X by Lemma 42 so post-processing
+ensures again that ϕ(X) + θ−1(V ) = ProjS ϕ(X) + ProjS⊥ ϕ(X) + θ−1(V ) is (D, A, fϵ)-DP.
+
+To demonstrate the optimality of our K-norm mechanism, we begin by establishing the mini-
+mality of the norm ball in the subspace S = span(S) and then extend this result to the space Rs
+
+using the isomorphism θ : S → Rs. In S, the sensitivity space S is bounded and rank-deficient,
+with rank s < d. The convex hull K = Hull(S) forms the minimal convex set containing S. Since
+K is a valid norm ball in S by Lemma 29, it is the smallest convex set that captures the variations
+of the sensitivity space. Consequently, any other norm ball in S that contains S must also contain
+K, making ∆K ·K the minimal norm ball with respect to the containment order among all norm
+balls in S. This minimality ensures that the K-norm mechanism defined by ∥ · ∥K is optimal in S,
+as it minimizes the noise required to maintain the privacy guarantees by aligning the noise precisely
+with the sensitivity space.
+
+The isomorphism θ between S and Rs is a linear bijection that preserves convexity, containment,
+and other geometric properties. By applying θ to the convex hull K, we obtain the set Ks = θ(K)
+in Rs. Since θ preserves the containment order, the minimality of K in S directly implies the
+minimality of Ks in Rs. Therefore, the norm ball ∆s ·Ks is the smallest convex set containing θ(S)
+in Rs. For any other norm ∥ ·∥H in Rs with norm ball ∆H ·H, we have ∆s ·Ks ⊆ ∆H ·H, indicating
+that ∆s ·Ks optimally contains θ(S).
+
+A.9 Proof of Theorem 32
+
+Proof Without loss of generality, consider an individual x in the dataset with features A1 = i and
+A2 = j, who attempts to pretend to be another individual y, where A1 = l and A2 = k. For the
+adversary to not detect the change, the feature combination (l, k) must correspond to a non-zero
+
+count in the contingency table. Specifically, this means #{i : X(i)
+1 = l} ≠ 0 and #{i : X(i)
+
+2 = k} ≠ 0.
+
+33
+
+
+
+Cho and Awan
+
+If these conditions are not satisfied, the adversary can immediately detect that x is lying, as such
+an individual y cannot exist based on the true counts provided by the invariant.
+
+In the case where xlk > 0, replacing x with y and simultaneously switching one of the xlk
+individuals in the dataset having features A1 = l and A2 = k with another individual having
+the feature A1 = i and A2 = j results in no net change in the contingency table. Specifically,
+such a switch preserves both the row and column sums, ensuring that the one-way margins remain
+unchanged. In this case, the number of changes is 2 and the corresponding element for the sensitivity
+space is 0.
+
+The worst-case scenario, which aligns with the upper bound on a(t) = 3, occurs when xlk = 0.
+In this situation, to maintain the one-way margins, one individual from the category A1 = l and
+A2 = j must be replaced with an individual with A1 = i and A2 = j. Similarly, one individual
+from the category A1 = i and A2 = k must be replaced with another individual having A1 = i and
+A2 = j. It is important to note that any other choice of switching results in more than 3 changes, so
+this switching process is the minimal one required to maintain the one-way margins. The resulting
+changes in the contingency table are as follows: xij increases by 1, xik decreases by 1, xlj decreases
+by 1, and xlk increases by 1.
+
+Alternatively, if we consider an individual x with features A1 = i and A2 = k, attempting to
+pretend to be y with features A1 = l and A2 = j, a similar process occurs. By switching individuals
+as outlined above, the resulting changes in the contingency table are xij − 1, xik + 1, xlj + 1, and
+xlk − 1.
+
+Consequently, we conclude that the sensitivity space is
+
+SSemi =
+{
+vijlk ∈ Rr×c : i, l ∈ {1, . . . , r}, j, k ∈ {1, . . . , c}, i ̸= l, j ̸= k
+
+}
+∪ {0}.
+
+A.10 Proof of Theorem 37
+
+To prove Theorem 37, we recall the neyman structure and its connection to unbiased tests.
+
+Definition 44 (Definition 4.120 of Schervish (2012)). For a parameter space Ω, let G ⊂ Ω. If T is
+a sufficient statistic for G, then a test ϕ has Neyman structure relative to G and T if Ew[ϕ(X)|T = t]
+is constant in t for all w ∈ G.
+
+Lemma 45 (Theorem 4.123 of Schervish (2012)). Let Ω = Ω0∪Ω1 be a partition. Let G = Ω̄0∩Ω̄1,
+where Ω̄0 is the closure of Ω. Let T be a boundedly complete sufficient statistic for G. Assume
+that the power function is continuous. If there is a UMPU level α test ϕ among those which have
+Neyman structure relative to G and T , then ϕ is UMPU level α.
+
+Lemma 46 Consider the 2× 2 table and the hypothesis H0: w ≤ 1 vs. H1 : w > 1. Let Φ be a set
+of tests. If there exists a UMP ϕ ∈ Φ among those with
+
+EH∼Hyper(t2·,t1·,t·1)ϕ(t·1 −H, t1· − t·1 +H,H, t2· −H) = α,
+
+for all α, then ϕ is UMPU size α among Φ.
+
+The following lemma is an adaptation of the Neyman-Pearson lemma for f -DP testing, as
+introduced in Awan and Vadhan (2023), applied to our context of Semi-DP by clarifying dataspace
+and adjacency function.
+
+34
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+Lemma 47 (Theorem 4.8 in Awan and Vadhan (2023)). Let f be a symmetric nontrivial tradeoff
+function, and let F be a CND for f . Consider X = {0, 1} and D = X n. Let P and Q be two
+exchangeable distributions on X n with pmfs p and q, such that q
+
+p is an increasing function of
+
+x =
+∑n
+
+i=1 xi. Let α ∈ (0, 1). Given that |x − x′| ≤ 1, where x and x′ are from datasets X and
+X ′ ∈ D, under the adjacency function A, the most powerful (X n, A, f)-DP test ϕ with significance
+level α for testing H0 : X ∼ P vs. H1 : X ∼ Q can be expressed in any of the following forms:
+
+1. There exists y ∈ {0, 1, 2, · · · , n} and c ∈ (0, 1) such that for all x ∈ {0, 1, 2, · · · , n},
+
+ϕ(x) = (1− f(1− ϕ(x− 1)))1(x > y) + c1(x = y),
+
+where if y > 0 then c satisfies c ≤ 1 − f(1), and c and y are chosen such that EPϕ(x) = α.
+If f(1) = 1, then y = 0.
+
+2. ϕ(x) = F (x−m), where m ∈ R is chosen such that EPϕ(x) = α.
+
+3. Let N ∼ F . The variable T = X +N satisfies f -DP. Then p = EX∼PF (X − T ) is a p-value
+and 1(p ≤ α)|X = 1(T ≥ m)|X ∼ Bern(ϕ(X)), where ϕ(x) agrees with 1 and 2 above.
+
+Proof of Theorem 37. We rely on Lemma 45 to establish the existence of a uniformly most
+powerful unbiased (UMPU) test among Φsemi
+
+f . By Lemma 45, we know that if a test has Neyman
+structure and is UMPU at level α among a set of unbiased tests, then it is the UMPU level α test.
+In our case, the parameter of interest w is the odds ratio, and we partition the parameter space as
+Ω = Ω0∪Ω1, where Ω0 represents the null hypothesis region w ≤ 1 and Ω1 represents the alternative
+hypothesis w > 1. Therefore, by Lemma 45, it is sufficient to consider tests which have Neyman
+structure relative to w = 1 and t = (t1·, t2·, t·1, t·2) = (x11 + x12, x21 + x22, x11 + x21, x12 + x22).
+That is, we only consider the tests among Φsemi
+
+f .
+To apply Lemma 47, note that x11 is the count and x21 can be differ by 1 for adjacent databases
+
+X,X ′ satisfying that Aa(t)(X,X
+′) = 1, guaranteed by Equation 2. For the tradeoff function f , by
+
+Lemma 47, there exists a most powerful Ψf test for H0 : w = 1 vs. H1 : w = w1(> 1), which is of
+the form
+
+ψ∗
+z(x) = Ff (x−m(t)),
+
+ψ∗
+z(x) = Ff (x −m(t)), where m(t) is chosen such that EH∼Hyper(t2·,t1·,t·1,1)Ff (H −m) = α. Since
+
+this test does not depend on the specific alternative, it is UMP for H0 : w ≤ 1 vs. H1 : w > 1. The
+p-value also followes from Lemma 47.
+
+Appendix B. Details on Simulation
+
+In this section, we provide implement details on ℓ1, ℓ2, ℓ∞ and K-norm mechanisms in Section 5.2.
+
+Algorithm 4 Sampling from ℓ1-mechanism
+
+1: Input: Query ϕ to be privatized, ∆1(S), and ϵ
+2: Set d = dim(ϕ(X))
+
+3: Draw Vj
+iid∼ Laplace
+
+(
+∆1(S)
+
+ϵ
+
+)
+, for j = 1, · · · , d
+
+4: Set V = (V1, · · · , Vd)⊤
+5: Output: ϕ(X) + V
+
+35
+
+
+
+Cho and Awan
+
+Algorithm 5 Sampling from ℓ2-mechanism (Wang et al., 2014)
+
+1: Input: Query ϕ to be privatized, ∆2(S), and ϵ
+2: Set d = dim(ϕ(X))
+3: Draw Z ∼ N(0, Id)
+4: Draw r ∼ Gamma(α = d, β = ϵ/∆2(S))
+5: Set V = rZ
+
+∥Z∥2
+6: Output: ϕ(X) + V
+
+Algorithm 6 Sampling from ℓ∞-mechanism (Steinke and Ullman, 2016)
+
+1: Input: Query ϕ to be privatized, ∆∞(S), and ϵ
+2: Set d = dim(ϕ(X))
+
+3: Set Uj
+iid∼ U(−1, 1) for j = 1, · · · , d
+
+4: Draw r ∼ Gamma(α = d+ 1, β = ϵ/∆∞(S))
+5: Set V = r · (U1, · · · , Ud)
+
+⊤
+
+6: Output: ϕ(X) + V
+
+References
+
+Martin Abadi, Andy Chu, Ian Goodfellow, H Brendan McMahan, Ilya Mironov, Kunal Talwar,
+and Li Zhang. Deep learning with differential privacy. In Proceedings of the 2016 ACM SIGSAC
+conference on computer and communications security, pages 308–318, 2016.
+
+John M Abowd, Robert Ashmead, Ryan Cumings-Menon, Simson Garfinkel, Micah Heineck, Chris-
+tine Heiss, Robert Johns, Daniel Kifer, Philip Leclerc, Ashwin Machanavajjhala, et al. The 2020
+census disclosure avoidance system topdown algorithm. Harvard Data Science Review, 2, 2022.
+
+Jordan Awan and Jinshuo Dong. Log-concave and multivariate canonical noise distributions for
+differential privacy. Advances in Neural Information Processing Systems, 35:34229–34240, 2022.
+
+Jordan Awan and Aishwarya Ramasethu. Optimizing noise for f -differential privacy via anti-
+concentration and stochastic dominance. arXiv preprint arXiv:2308.08343, 2023.
+
+Jordan Awan and Aleksandra Slavković. Differentially private uniformly most powerful tests for
+binomial data. Advances in Neural Information Processing Systems, 31, 2018.
+
+Jordan Awan and Aleksandra Slavković. Structure and sensitivity in differential privacy: Com-
+paring k-norm mechanisms. Journal of the American Statistical Association, 116(534):935–954,
+2021.
+
+Jordan Awan and Salil Vadhan. Canonical noise distributions and private hypothesis tests. The
+Annals of Statistics, 51(2):547–572, 2023.
+
+Jordan Awan, Adam Edwards, Paul Bartholomew, and Andrew Sillers. Best linear unbiased esti-
+mate from privatized histograms. arXiv preprint arXiv:2409.04387, 2024.
+
+Borja Balle and Yu-Xiang Wang. Improving the Gaussian mechanism for differential privacy:
+Analytical calibration and optimal denoising. In International Conference on Machine Learning,
+pages 394–403. PMLR, 2018.
+
+36
+
+
+
+Formal Privacy Guarantees with Invariant Statistics
+
+Mark Bun and Thomas Steinke. Concentrated differential privacy: Simplifications, extensions, and
+lower bounds. In Theory of Cryptography Conference, pages 635–658. Springer, 2016.
+
+Kamalika Chaudhuri, Claire Monteleoni, and Anand D Sarwate. Differentially private empirical
+risk minimization. Journal of Machine Learning Research, 12(3), 2011.
+
+Prathamesh Dharangutte, Jie Gao, Ruobin Gong, and Fang-Yi Yu. Integer subspace differential
+privacy. In Proceedings of the AAAI Conference on Artificial Intelligence, volume 37, pages
+7349–7357, 2023.
+
+Bolin Ding, Janardhan Kulkarni, and Sergey Yekhanin. Collecting telemetry data privately. Ad-
+vances in Neural Information Processing Systems, 30, 2017.
+
+Jinshuo Dong, Aaron Roth, and Weijie J Su. Gaussian differential privacy. Journal of the Royal
+Statistical Society Series B: Statistical Methodology, 84(1):3–37, 2022.
+
+Cynthia Dwork. Differential privacy. In International colloquium on automata, languages, and
+programming, pages 1–12. Springer, 2006.
+
+Cynthia Dwork, Frank McSherry, Kobbi Nissim, and Adam Smith. Calibrating noise to sensitivity
+in private data analysis. In Theory of Cryptography: Third Theory of Cryptography Conference,
+TCC 2006, New York, NY, USA, March 4-7, 2006. Proceedings 3, pages 265–284. Springer, 2006.
+
+Úlfar Erlingsson, Vasyl Pihur, and Aleksandra Korolova. Rappor: Randomized aggregatable
+privacy-preserving ordinal response. In Proceedings of the 2014 ACM SIGSAC conference on
+computer and communications security, pages 1054–1067, 2014.
+
+Jie Gao, Ruobin Gong, and Fang-Yi Yu. Subspace differential privacy. In Proceedings of the AAAI
+Conference on Artificial Intelligence, volume 36, pages 3986–3995, 2022.
+
+Ruobin Gong and Xiao-Li Meng. Congenial differential privacy under mandated disclosure. In
+Proceedings of the 2020 ACM-IMS on foundations of data science conference, pages 59–70, 2020.
+
+Moritz Hardt and Kunal Talwar. On the geometry of differential privacy. In Proceedings of the
+forty-second ACM symposium on Theory of computing, pages 705–714, 2010.
+
+Daniel Kifer and Ashwin Machanavajjhala. Pufferfish: A framework for mathematical privacy
+definitions. ACM Transactions on Database Systems (TODS), 39(1):1–36, 2014.
+
+Minwoo Kim, Jonghyeok Lee, SeungWoo Kwak, and Sungkyu Jung. Differentially private multivari-
+ate statistics with an application to contingency table analysis. arXiv preprint arXiv:2211.15019,
+2022.
+
+Andrew Lowy, Zeman Li, Tianjian Huang, and Meisam Razaviyayn. Optimal differentially private
+learning with public data. arXiv preprint arXiv:2306.15056, 2023.
+
+Ilya Mironov. Rényi differential privacy. In 2017 IEEE 30th computer security foundations sympo-
+sium (CSF), pages 263–275. IEEE, 2017.
+
+Mark J Schervish. Theory of statistics. Springer Science & Business Media, 2012.
+
+Jeremy Seeman, Matthew Reimherr, and Aleksandra Slavkovic. Formal privacy for partially private
+data. arXiv preprint arXiv:2204.01102, 2022.
+
+37
+
+
+
+Cho and Awan
+
+Thomas Steinke and Jonathan Ullman. Between pure and approximate differential privacy. Journal
+of Privacy and Confidentiality, 7(2):3–22, 2016.
+
+Buxin Su, Weijie J Su, and Chendi Wang. The 2020 united states decennial census is more private
+than you (might) think. arXiv preprint arXiv:2410.09296, 2024.
+
+ADP Team et al. Learning with privacy at scale. Apple Mach. Learn. J, 1(8):1–25, 2017.
+
+Yu Wang, Zhenqi Huang, Sayan Mitra, and Geir E Dullerud. Entropy-minimizing mechanism for
+differential privacy of discrete-time linear feedback systems. In 53rd IEEE conference on decision
+and control, pages 2130–2135. IEEE, 2014.
+
+38
+
+
+	Introduction
+	Related Literature
+	Our Contributions
+	Paper Organization
+	Preliminaries on Differential Privacy
+	Adjacency in Differential Privacy
+	Differential Privacy via Hypothesis Testing
+	Mechanism Design
+
+	Semi Differential Privacy
+	Challenges of Preserving DP with Invariants
+	Limitations of Subspace DP
+	Semi Differential Privacy
+	Example on Count Statistics
+	Comparison Between Semi-DP Guarantees
+	Properties of Semi-DP
+
+	Mechanism Design
+	Mechanism Design via Analysis on Sensitivity Space
+	Optimal K-Norm Mechanism
+
+	Application to Contingency Table Analysis
+	Private Release of Contingency Table under True Margins
+	Numerical Experiments for additive noise
+	Semi Private UMPU Testing
+
+	Analysis on US 2020 Census Redistricting Data (P.L. 94-171)
+	Semi-DP Analysis of the US Census Product
+
+	Conclusion and Discussion
+	Proofs
+	Proof of Theorem 16
+	Proof of Theorem 21
+	Proof of Proposition 24
+	Proof of Proposition 25
+	Proof for Proposition 26
+	Proof for Proposition 28
+	Proof for Lemma 29
+	Proof for Theorem 31
+	Proof of Theorem 32
+	Proof of Theorem 37
+	Details on Simulation
+
+
+
