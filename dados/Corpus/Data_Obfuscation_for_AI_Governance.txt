@@ -971,8 +971,4 @@ machine learning models," in 2017 IEEE Symposium on Security and Privacy (SP), 2
 privacy in machine learning," arXiv preprint arXiv:1611.03814, 2016. 
 
 [20] A. Adadi and M. Berrada, "Peeking inside the black-box: A survey on explainable artificial 
-intelligence (XAI)," IEEE Access, vol. 6, pp. 52138-52160, 2018. 
-
- 
-
-
+intelligence (XAI)," IEEE Access, vol. 6, pp. 52138-52160, 2018.

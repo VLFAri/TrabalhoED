@@ -1,8 +1,8 @@
-import extracao.InserirDocumentosEComprimeComHuffman;
+import extracao.GerenciadorDeDocumentos;
 import hash.HashTable;
-import hash.HashEntry;
 import trie.Trie;
 import java.util.*;
+import compactacao.ArvoreHuffman;
 import java.io.IOException;
 
 /* Nomes dos integrantes do grupo 01: 
@@ -20,87 +20,101 @@ import java.io.IOException;
 public class App{
 
 	public static void main(String[] args) throws IOException {
-		Scanner sc = new Scanner(System.in); //Objeto para que o usuário consiga inserir a entrada
+
+		// Instancias
+		Scanner teclado = new Scanner(System.in);
+		GerenciadorDeDocumentos gerente = new GerenciadorDeDocumentos();
+		Map<String,String> artigos;
+		Map<String,ArvoreHuffman> huffmanMap = new HashMap<>();
+		Map<String,Trie> trieMap = new HashMap<>();
+		Map<String,List<String>> palavrasArtigos;
+		HashTable<String,String> hash;
+
+		// Inserindo
 		System.out.print("> Inserir documentos: ");
-		String documento = sc.next(); //Caminho de diretório digitado para usuário
-		InserirDocumentosEComprimeComHuffman idch = new InserirDocumentosEComprimeComHuffman(); //objeto que instancia a classe InserirDocumentosECompactaComHuffman 
-		
-		/* O método abaixo irá retornas um map que tem como chave o nome do artigo e como conteudo o valor do arquivo comprimido. Ele será usado para inserção na Hash.
-		 * O true descrito como parametro será utilizadp para que o programa saiba que deve fazer a compressão com Huffman (caso fosse false, ele não iria comprimir (será utilizado
-		 * em outra parte do código). 
-		 */
-		Map<String,String> artigosComprimidos = idch.insereDocumentosEComprime(documento,true); 
+		String pasta = teclado.next(); //Caminho de diretório digitado para usuário
+		artigos = gerente.carregarConteudoArquivos(pasta);
 		System.out.println("");
 		
-		//Caso "artigosComprimidos" seja null, significa que ou o caminho digitado pelo usuário é inválido ou o caminho não possuia arquivos, e assim, o programa não poderá fazer o seu trabalho
-		if(artigosComprimidos != null) { //Mas caso seja válido e tenha arquivos TXT
+		//Caso "artigos" seja null, significa que ou o caminho digitado pelo usuário é inválido
+		// ou o caminho não possuia arquivos, e assim, o programa não poderá fazer o seu trabalho
+		if(artigos != null) {
 			
-			/* O método abaixo retorna um mapa que tem como chave o nume do arquivo e um array de strings como valor, onde cada posição do array é uma palavra
-			 * do arquivo que dá nome a chave. Separamos em palavras para que seja possível inserir na Trie, já a mesma não pode inserir várias palavras, ou seja,
-			 * um texto de uma só vez. Resumindo, cada chave terá um array com cada palavra do artigo (nas posições do array) que representa a chave
-			 */
-			Map<String,List<String>> palavrasNComprimidos = idch.textos_nComprimidos(documento);
+			// Comprimindo
+			for (Map.Entry<String, String> entry : artigos.entrySet()) {
+				String key = entry.getKey(); // Obter a chave (nome do artigo)
+				String value = entry.getValue(); // Obter o valor (artigo)
 
+				// Criando Huffman
+				ArvoreHuffman huffman = new ArvoreHuffman(value);
+				huffmanMap.put(key, huffman);
+
+				// Substituindo por artigo Comprimido
+				artigos.put(key, huffman.Comprimir(value));
+			}
+
+			// Inserindo na Hash
 			System.out.print("> Qual a função de hashing (divisao/djb2): ");
-			String funcaoHashEscolhida = sc.next(); //Usuário vai escolher qual cálculo de hash vai usar
-			
-			//Usuário deve escolher entre divisao e djb2
-			if(funcaoHashEscolhida.equals("divisao") || funcaoHashEscolhida.equals("djb2")) {
-				HashTable<String,String> hash;
-				if(funcaoHashEscolhida.equals("divisao") ) { //Se for divisao
-					hash = new HashTable<String,String>(artigosComprimidos.size(),"divisao"); //Cria um objeto que instancia a classe HashTable se baseando no cálculo de divisão
-				}
-				
-				else { //Se for djb2
-					hash = new HashTable<String,String>(artigosComprimidos.size(),"djb2"); //Cria um objeto que instancia a classe HashTable se baseando no cálculo djb2
-				}
-				
-				hash.inserir(artigosComprimidos); //Aqui ele vai indexar os arquivos comprimidos na Hash
-				
+			String funcaoHashEscolhida = teclado.next(); //Usuário vai escolher qual cálculo de hash vai usar
+			System.out.println("");
+			while (!funcaoHashEscolhida.equals("divisao") && !funcaoHashEscolhida.equals("djb2")) {
+				System.out.println("Função de hashing indisponível!");
+				System.out.print("> Qual a função de hashing (divisao/djb2): ");
+				funcaoHashEscolhida = teclado.nextLine();
 				System.out.println("");
-				
-				//A partir daqui utilizaremos o Map que criamos antes, com o array de Strings, para inserir na Trie
-				System.out.print("> Buscar palavra: ");
-				String palavra = sc.next(); //Usuário irá digitar a palavra 
-				System.out.println("A palavra '" + palavra + "' foi encontrada nos seguintes documentos:");
-				boolean verifica = false; //boolean usado para ver se alguma palavra foi encontrada em algum artigo
-				for(String word: palavrasNComprimidos.keySet()) { //Aqui ele vai percorrer todo o Mapa e ver se encontra a palavra utilizando a Trie
-					Trie new_trie = new Trie(); //Objeto que instancia a classe Trie
-					for(int i=0;i<palavrasNComprimidos.get(word).size();i++) { //Percorre o array da chave que estiver sendo percorrida no momento
-						new_trie.inserir(palavrasNComprimidos.get(word).get(i)); //Insere cada palavra do array na Trie
-					}
-					if(new_trie.buscarPalavra(palavra)) { //O método irá retornar true se encontrar a palavra que o usuário digitou ou false caso contrário
-						System.out.println(word); //Imprime o artigo na qual a palavra foi encontrada
-						verifica = true; //Se achou, "verifica" agora fica true
-					}
-				} //Laço continua rodando até todas as chaves serem percorridas.
-				
-				if(!verifica) { //Caso verifica seja falso, significado que a palavra não foi encontrada em nenhum artigo.
-					System.out.println("Palavra não encontrada em nenhum documento!");
+			}
+			hash = new HashTable<String,String>(artigos.size(), funcaoHashEscolhida); // Instancia de hash
+			hash.inserir(artigos); //Aqui ele vai indexar os arquivos comprimidos na Hash 
+			System.out.println("Documentos indexados com sucesso!");
+			artigos.clear(); // "Exclui" artigos para reduzir uso de memória.
+
+			// Criando Tries
+			palavrasArtigos = gerente.carregarPalavrasParaBusca(pasta); // Cria um map com <nome dos artigos, lista de palavras do artigo>
+			for (Map.Entry<String, List<String>> entry : palavrasArtigos.entrySet()) {
+				String nomeArtigo = entry.getKey(); // Nome do artigo
+				List<String> palavras = entry.getValue(); // Lista de palavras do artigo
+
+				// Criando a Trie para o artigo
+				Trie trie = new Trie();
+				for (String palavra : palavras) {
+					trie.inserir(palavra); // Insere cada palavra na Trie
 				}
-				
-				else { //Caso tenha sido encontrada...
-					System.out.println("");
-					System.out.print("> Do(s) documento(s) que tem a palavra, me mostre o conteúdo do documento: ");
-					String documento_escolhido = sc.next(); //Usuário vai digitar qual dos artigos que tem a palavra que ele inseriu ele quer abrir
-					
-					/* O mapa abaixo se baseia analogamente ao mapa que utilizamos para inserir os arquivos comprimidos na Hash (aritgosComprimidos), com o mesmo sistema de inserção.
-					 * A diferença é que dessa vez ele não vai comprimir, ele vai trazer o texto da forma que ele foi extraido para que assim o programa possa mostrar 
-					 * no terminal o artigo que o usuário pediu que abrisse.
-					 * Dá para perceber a diferença no boolean que está como parâmetro, já que la em "artigosComprimidos" era true, significava que era para comprimir, nesse caso, como é
-					 * false, não é para comprimir.  
-					 */
-					Map<String,String> artigosNComprimidos = idch.insereDocumentosEComprime(documento,false);
-					
-					//Aqui o método vai retornar o texto do arquivo
-					hash.mostrarConteudo(documento_escolhido,artigosNComprimidos); // 
-				}							
+
+				// Associa a Trie ao nome do artigo no mapa
+				trieMap.put(nomeArtigo, trie);
+			}
+			palavrasArtigos.clear(); // "Exclui" palavrasArtigo para reduzir uso de memória.
+			
+			// Buscando Palavras
+			System.out.print("> Buscar palavra: ");
+			String palavra = teclado.next(); //Usuário irá digitar a palavra 
+			System.out.println("");
+			System.out.println("A palavra '" + palavra + "' foi encontrada nos seguintes documentos:");
+
+			boolean contemPalavra = false; // Usado para ver se palavra foi encontrada
+			for (Map.Entry<String, Trie> entry : trieMap.entrySet()) {
+				String key = entry.getKey(); // Obter a chave (nome do artigo)
+				Trie value = entry.getValue(); // Obter o valor (Trie)
+
+				if(value.buscarPalavra(palavra)) {
+					System.out.println(key); // Imprime o artigo na qual a palavra foi encontrada
+					contemPalavra = true;
+				}
 			}
 			
-			else { //Nesse caso, o tipo escolhido não é válido para esse programa.
-				System.out.println("Função de hashing não disponível (função de hashing não disponibilizada e/ou digitada errada! Por favor rode o código denovo");
-			}
+			if(!contemPalavra) { // Palavra não foi encontrada em nenhum artigo.
+				System.out.println("Palavra não encontrada em nenhum documento!");
+			} 
 			
+			// Mostrar conteúdo
+			else {
+				System.out.println("");
+				System.out.print("> Do(s) documento(s) que tem a palavra, me mostre o conteúdo do documento: ");
+				String documento_escolhido = teclado.next();
+				System.out.println(huffmanMap.get(documento_escolhido).Descomprimir(hash.getValor(documento_escolhido)));
+			}
 		}
+
+		teclado.close();
 	}
 }
